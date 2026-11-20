@@ -1165,12 +1165,29 @@ const mailer = {
   },
   async send(mails) {
     const url = `/users/${sp.cfg.mail.trim()}/sendMail`;
+    const versuch = ablegen => sp.batch(mails.map(m => ({ method: 'POST', url, body: {
+      message: { subject: m.subject, body: { contentType: 'HTML', content: m.html }, toRecipients: [{ emailAddress: { address: m.to } }] },
+      saveToSentItems: ablegen } })), 'E-Mails', 'Exchange');
     try {
-      await sp.batch(mails.map(m => ({ method: 'POST', url, body: { message: { subject: m.subject, body: { contentType: 'HTML', content: m.html }, toRecipients: [{ emailAddress: { address: m.to } }] }, saveToSentItems: true } })), 'E-Mails');
-    } catch (e) {
-      if (/403|SendAs|Access is denied|AccessDenied/i.test(e.message)) throw new Error(`E-Mail nicht gesendet: Dir fehlt „Senden als“ für ${sp.cfg.mail} (Setup-Skript ausführen). Die Daten sind gespeichert.`);
-      throw new Error('E-Mail-Versand fehlgeschlagen: ' + e.message + ' – die Daten sind gespeichert.');
+      await versuch(true);                       // mit Ablage in „Gesendete Elemente“ des Postfachs
+    } catch (e1) {
+      // „not found in the store“ = Vollzugriff auf das Postfach (noch) nicht aktiv -> ohne Ablage erneut senden
+      if (/404|not found in the store|ErrorItemNotFound|failed to get the correct properties/i.test(e1.message)) {
+        try { await versuch(false); return; }
+        catch (e2) { throw mailer.fehler(e2); }
+      }
+      throw mailer.fehler(e1);
     }
+  },
+  fehler(e) {
+    const m = e.message || String(e), box = sp.cfg.mail;
+    if (/403|SendAs|Access is denied|AccessDenied|ErrorSendAsDenied/i.test(m))
+      return new Error(`E-Mail nicht gesendet: Dir fehlt „Senden als“ für ${box}. Nach dem Setup kann das bis zu 60 Min. dauern. Die Daten sind gespeichert.`);
+    if (/404|not found in the store|ErrorItemNotFound|failed to get the correct properties|ResourceNotFound/i.test(m))
+      return new Error(`E-Mail nicht gesendet: Postfach ${box} nicht gefunden oder Berechtigung noch nicht aktiv (Exchange braucht nach dem Setup bis zu 60 Min.). Die Daten sind gespeichert.`);
+    if (/AADSTS65001|consent|scope/i.test(m))
+      return new Error('E-Mail nicht gesendet: Berechtigung „Mail.Send.Shared“ fehlt oder noch nicht zugestimmt (DHO-Mail-Setup.ps1). Die Daten sind gespeichert.');
+    return new Error('E-Mail nicht gesendet: ' + m + ' – die Daten sind gespeichert.');
   }
 };
 // Welche Namen sind neu dazugekommen?
@@ -1570,7 +1587,7 @@ const sp = {
   update(key, id, fields) { return this.req('PATCH', this.itemUrl(key, id) + '/fields', fields); },
   remove(key, id) { return this.req('DELETE', this.itemUrl(key, id)); },
   // JSON-Batch: max. 20 Anfragen pro Aufruf, Wiederholung bei 429/503
-  async batch(reqs, label) {
+  async batch(reqs, label, quelle) {
     const results = new Array(reqs.length);
     let pending = reqs.map((r, i) => i);
     for (let runde = 0; pending.length && runde < 5; runde++) {
@@ -1589,7 +1606,7 @@ const sp = {
         for (const x of res.responses) {
           const i = +x.id;
           if (x.status === 429 || x.status === 503) retry.push(i);
-          else if (x.status >= 400) throw new Error(graphError(x.status, JSON.stringify(x.body || {})));
+          else if (x.status >= 400) throw new Error(graphError(x.status, JSON.stringify(x.body || {}), quelle));
           else results[i] = x;
         }
       }
@@ -1600,12 +1617,15 @@ const sp = {
     return results;
   }
 };
-function graphError(status, text) {
-  let msg = text;
-  try { msg = JSON.parse(text).error?.message || text; } catch (e) { }
-  if (status === 403) msg += ' – Schreibrechte fehlen (App-Berechtigung Sites.ReadWrite.All oder Bearbeitungsrecht auf der Site).';
-  if (status === 404) msg += ' – Site oder Liste nicht gefunden.';
-  return `SharePoint ${status}: ${msg}`;
+function graphError(status, text, quelle = 'SharePoint') {
+  let msg = text, code = '';
+  try { const j = JSON.parse(text); msg = j.error?.message || text; code = j.error?.code || ''; } catch (e) { }
+  if (code) msg = `${code}: ${msg}`;
+  if (quelle === 'SharePoint') {
+    if (status === 403) msg += ' – Schreibrechte fehlen (App-Berechtigung Sites.ReadWrite.All oder Bearbeitungsrecht auf der Site).';
+    if (status === 404) msg += ' – Site oder Liste nicht gefunden.';
+  }
+  return `${quelle} ${status}: ${msg}`;
 }
 const spDate = v => v ? toDate(new Date(v)) : null;
 
