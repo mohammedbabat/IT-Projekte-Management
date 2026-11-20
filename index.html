@@ -156,6 +156,22 @@
   svg text { fill: var(--text-secondary); font-size: 12px; font-family: "CorpoS", "Trebuchet MS", Arial, sans-serif; }
   .heat { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 12px; }
   .heat th { font-weight: 700; color: var(--text-secondary); text-align: left; padding: 4px var(--sp-inline); white-space: nowrap; }
+  .heat td.hc, .heat th.hb { cursor: pointer; }
+  .heat td.hc:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .heat th.hb:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .det-sum { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--sp-step); }
+  .det-big { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .det-chips { display: flex; gap: var(--sp-step); flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+  .det-h { margin: var(--sp-block) 0 var(--sp-inline); font-size: 14px; padding-left: var(--sp-inline); border-left: var(--accent-line) solid; color: var(--accent); }
+  .det-list { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .det-list td { padding: var(--sp-inline); border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .det-list tr { cursor: pointer; }
+  .det-list tr:hover td { background: var(--surface-0); }
+  .det-nr { width: 1%; white-space: nowrap; color: var(--text-muted); font-weight: 700; }
+  .det-t { font-weight: 700; }
+  .det-o { width: 18%; color: var(--text-secondary); }
+  .det-f { width: 1%; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  .det-f.over { color: var(--overdue-fg); font-weight: 700; }
   .heat td { text-align: center; padding: 6px 4px; font-variant-numeric: tabular-nums; cursor: default; font-weight: 700; }
 
   /* Tabellen */
@@ -652,20 +668,24 @@ function renderTimeline() {
   }).join('');
   $('#timeline').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Zeitplan der Häuser">${ticks}${rows}<line x1="${x(today)}" x2="${x(today)}" y1="${top - 6}" y2="${H}" stroke="var(--critical)" stroke-width="2"/></svg>`;
 }
+let heatBereiche = [];
 function renderHeat() {
   const bereiche = [...new Set((state.vorlage.length ? state.vorlage : state.tasks).map(t => t.bereich))].filter(Boolean);
   const steps = ['--seq-0', '--seq-1', '--seq-2', '--seq-3', '--seq-4', '--seq-5', '--seq-6'];
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const cell = ts => {
+  const cell = (ts, hId, bIdx) => {
     const s = stats(ts);
     if (!s.total) return '<td class="muted">–</td>';
     const i = Math.min(6, Math.round(s.pct * 6));
     const fg = dark ? (i >= 5 ? '#0e214a' : 'var(--text-primary)') : (i >= 4 ? '#ffffff' : 'var(--text-primary)');
-    return `<td style="background:var(${steps[i]});color:${fg}" data-tip="${s.done} von ${s.total} erledigt${s.over ? '\n' + s.over + ' überfällig' : ''}">${Math.round(s.pct * 100)}${s.over ? ' <span style="color:' + (i >= 4 && !dark ? '#f6e1df' : 'var(--critical)') + '">●</span>' : ''}</td>`;
+    return `<td class="hc" data-h="${hId}" data-b="${bIdx}" style="background:var(${steps[i]});color:${fg}" data-tip="${s.done} von ${s.total} erledigt${s.over ? '\n' + s.over + ' überfällig' : ''}\nKlicken für Details">${Math.round(s.pct * 100)}${s.over ? ' <span style="color:' + (i >= 4 && !dark ? '#f6e1df' : 'var(--critical)') + '">●</span>' : ''}</td>`;
   };
   let html = `<table class="heat"><thead><tr><th>Bereich</th>${state.houses.map(h => `<th>${esc(h.ort)}</th>`).join('')}</tr></thead><tbody>`;
-  for (const b of bereiche) html += `<tr><th>${esc(b)}</th>${state.houses.map(h => cell(state.tasks.filter(t => t.hausId === h.id && t.bereich === b))).join('')}</tr>`;
-  $('#heat').innerHTML = html + '</tbody></table><div class="muted small" style="margin-top:8px">Zahl = % erledigt · <span style="color:var(--critical)">●</span> = enthält überfällige Punkte</div>';
+  heatBereiche = bereiche;
+  bereiche.forEach((b, bi) => {
+    html += `<tr><th class="hb" data-b="${bi}" data-tip="Bereich über alle Häuser anzeigen">${esc(b)}</th>${state.houses.map(h => cell(state.tasks.filter(t => t.hausId === h.id && t.bereich === b), h.id, bi)).join('')}</tr>`;
+  });
+  $('#heat').innerHTML = html + '</tbody></table><div class="muted small" style="margin-top:8px">Zahl = % erledigt · <span style="color:var(--critical)">●</span> = enthält überfällige Punkte · Feld oder Bereich anklicken = Details</div>';
 }
 
 // ==================================================================
@@ -737,11 +757,15 @@ function renderVorlage() {
 // Formular-Dialog
 // ==================================================================
 let dlgState = null;
-function openForm({ title, fields, values, onSave, onDelete, extra, saveLabel }) {
+function openForm({ title, fields, values, onSave, onDelete, extra, saveLabel, readOnly }) {
   dlgState = { fields, onSave, onDelete };
+  $('#tip').style.display = 'none';
   $('#dlgTitle').textContent = title;
   $('#dlgMsg').textContent = '';
   $('#dlgSave').textContent = saveLabel || 'Speichern';
+  $('#dlgSave').classList.toggle('hidden', !!readOnly);
+  $('#dlgCancel').textContent = readOnly ? 'Schließen' : 'Abbrechen';
+  $('#dlgFields').style.display = fields.length ? '' : 'none';
   $('#dlgDelete').classList.toggle('hidden', !onDelete);
   $('#dlgFields').innerHTML = fields.map(f => {
     const v = values[f.k];
@@ -795,6 +819,49 @@ async function runBusy(btn, fn) {
   try { await fn(); }
   catch (e) { console.error(e); const m = e.message || String(e); if ($('#dlg').open) $('#dlgMsg').textContent = m; toast(m, true); }
   finally { btn.disabled = false; btn.textContent = txt; }
+}
+
+
+// ---------- Detailansicht: erledigt / nicht erledigt ----------
+function openDetail(title, tasks, opts = {}) {
+  const multiHouse = new Set(tasks.map(t => t.hausId)).size > 1;
+  const sortT = (a, b) => (multiHouse ? String(a.haus).localeCompare(String(b.haus)) : 0) || a.nr - b.nr;
+  const gruppen = [
+    ['Überfällig', tasks.filter(isOverdue), 'var(--critical)'],
+    ['Offen / in Arbeit', tasks.filter(t => OPEN.includes(t.status) && !isOverdue(t)), 'var(--warning)'],
+    ['Erledigt', tasks.filter(t => t.status === 'erledigt'), 'var(--good)'],
+    ['Entfällt', tasks.filter(t => t.status === 'entfällt'), 'var(--neutral)']
+  ];
+  const s = stats(tasks);
+  let html = `<div class="det-sum">
+      <div><span class="det-big">${Math.round(s.pct * 100)} %</span><span class="muted"> erledigt</span></div>
+      <div class="det-chips">${gruppen.map(([n, l, c]) => `<span class="det-chip"><span class="dot" style="background:${c}"></span>${n}: <b>${l.length}</b></span>`).join('')}</div>
+    </div>${progressBar(s)}`;
+  for (const [name, list, color] of gruppen) {
+    if (!list.length) continue;
+    html += `<h4 class="det-h" style="border-left-color:${color}">${name} <span class="muted">(${list.length})</span></h4><table class="det-list">`;
+    for (const t of list.sort(sortT)) {
+      const over = isOverdue(t);
+      const frist = t.status === 'erledigt' ? (t.erledigtAm ? 'erledigt am ' + fmt(t.erledigtAm) : 'erledigt')
+        : (t.frist ? fmt(t.frist) + (over ? ` · ${-daysUntil(t.frist)} T. drüber` : '') : (t.fristText || '–'));
+      html += `<tr data-task="${t.id}" data-tip="Klicken zum Bearbeiten">
+        <td class="det-nr">${multiHouse ? esc(t.haus) + ' · ' : ''}${t.nr}</td>
+        <td><div class="det-t">${esc(t.aufgabe)}</div>${t.notiz ? `<div class="note">${esc(t.notiz)}</div>` : ''}</td>
+        <td class="det-o">${esc(t.owner || '')}</td>
+        <td class="det-f ${over ? 'over' : ''}">${frist}</td></tr>`;
+    }
+    html += '</table>';
+  }
+  if (!tasks.length) html += '<p class="muted">Keine Punkte.</p>';
+  if (opts.hausId) html += `<p style="margin-top:16px"><a href="#/aufgaben" id="detToList">In der Aufgabenliste öffnen →</a></p>`;
+  openForm({ title, fields: [], values: {}, extra: html, readOnly: true });
+  $('#dlgExtra').onclick = e => {
+    const tr = e.target.closest('tr[data-task]'); if (!tr) return;
+    const t = state.tasks.find(x => x.id === +tr.dataset.task); if (!t) return;
+    closeDlg(); taskForm(t, false);
+  };
+  const lnk = $('#detToList');
+  if (lnk) lnk.onclick = () => { closeDlg(); setTimeout(() => { $('#fHaus').value = String(opts.hausId); $('#fStatus').value = 'alle'; renderTable(); }, 0); };
 }
 
 // ---------- Aufgabe ----------
@@ -1227,6 +1294,16 @@ $('#btnRefresh').onclick = async () => { if (await loadLive(true)) toast('Daten 
 ['#fHaus', '#fStatus', '#fOwner'].forEach(s => $(s).addEventListener('change', renderTable));
 $('#fSearch').addEventListener('input', renderTable);
 
+$('#heat').addEventListener('click', e => {
+  const td = e.target.closest('td.hc');
+  if (td) {
+    const h = state.houses.find(x => x.id === +td.dataset.h), b = heatBereiche[+td.dataset.b];
+    openDetail(`${h.ort} – ${b}`, state.tasks.filter(t => t.hausId === h.id && t.bereich === b), { hausId: h.id });
+    return;
+  }
+  const th = e.target.closest('th.hb');
+  if (th) { const b = heatBereiche[+th.dataset.b]; openDetail(`${b} – alle Häuser`, state.tasks.filter(t => t.bereich === b)); }
+});
 $('#houses').addEventListener('click', e => {
   const c = e.target.closest('.house'); if (!c) return;
   location.hash = '#/aufgaben'; setTimeout(() => { $('#fHaus').value = c.dataset.haus; renderTable(); }, 0);
