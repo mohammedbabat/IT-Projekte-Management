@@ -6,6 +6,7 @@
 <title>DHO Hotelübernahmen – IT-Projektmanagement</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="lib/msal-browser.min.js"></script>
+<script src="config.js"></script>
 <style>
   /* =====================================================================
      Dorint CD 2023 – Design-System
@@ -1530,8 +1531,8 @@ const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO 
 let msalApp = null, refreshTimer = null;
 
 function loadCfg() {
-  let c = {};
-  try { c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch (e) { }
+  let c = Object.assign({}, window.DHO_CONFIG || {});   // Standard aus config.js
+  try { for (const [k, v] of Object.entries(JSON.parse(localStorage.getItem(CFG_KEY) || '{}'))) if (v) c[k] = v; } catch (e) { }   // gespeicherte Werte (leere ignorieren)
   const p = new URLSearchParams(location.search);
   for (const k of ['tenant', 'client', 'site', 'mail']) if (p.get(k)) c[k] = p.get(k);
   return c;
