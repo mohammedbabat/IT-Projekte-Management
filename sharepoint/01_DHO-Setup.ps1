@@ -146,7 +146,7 @@ New-DHOListe -Titel $ListeVorlage -Url 'Lists/DHOChecklisteVorlage' -TitelAnzeig
 
 Add-DHOFeld $ListeVorlage 'Nr'         '<Field Type="Number" Name="Nr" StaticName="Nr" DisplayName="Nr." Decimals="0" Required="TRUE" />'
 Add-DHOFeld $ListeVorlage 'Bereich'    '<Field Type="Text" Name="Bereich" StaticName="Bereich" DisplayName="Bereich" />'
-Add-DHOFeld $ListeVorlage 'Owner'      '<Field Type="Text" Name="Owner" StaticName="Owner" DisplayName="Wen frage ich?" />'
+Add-DHOFeld $ListeVorlage 'Owner'      '<Field Type="Text" Name="Owner" StaticName="Owner" DisplayName="Zuständig / Ansprechpartner" />'
 Add-DHOFeld $ListeVorlage 'Bezug'      "<Field Type=`"Choice`" Name=`"Bezug`" StaticName=`"Bezug`" DisplayName=`"Bezug (Ü/X)`" Format=`"Dropdown`"><Default>X</Default><CHOICES>$(ConvertTo-ChoiceXml @('Ü','X','fix'))</CHOICES></Field>"
 Add-DHOFeld $ListeVorlage 'OffsetTage' '<Field Type="Number" Name="OffsetTage" StaticName="OffsetTage" DisplayName="Offset Tage" Decimals="0" />'
 Add-DHOFeld $ListeVorlage 'FristText'  '<Field Type="Text" Name="FristText" StaticName="FristText" DisplayName="Frist-Text (sofort/laufend)" />'
@@ -168,7 +168,7 @@ Add-DHOFeld $ListeAufgaben 'Haus'       '<Field Type="Text" Name="Haus" StaticNa
 Add-DHOFeld $ListeAufgaben 'HausID'     '<Field Type="Number" Name="HausID" StaticName="HausID" DisplayName="Haus-ID" Decimals="0" Indexed="TRUE" />'
 Add-DHOFeld $ListeAufgaben 'Nr'         '<Field Type="Number" Name="Nr" StaticName="Nr" DisplayName="Nr." Decimals="0" />'
 Add-DHOFeld $ListeAufgaben 'Bereich'    '<Field Type="Text" Name="Bereich" StaticName="Bereich" DisplayName="Bereich" />'
-Add-DHOFeld $ListeAufgaben 'Owner'      '<Field Type="Text" Name="Owner" StaticName="Owner" DisplayName="Wen frage ich?" />'
+Add-DHOFeld $ListeAufgaben 'Owner'      '<Field Type="Text" Name="Owner" StaticName="Owner" DisplayName="Zuständig / Ansprechpartner" />'
 Add-DHOFeld $ListeAufgaben 'Bezug'      "<Field Type=`"Choice`" Name=`"Bezug`" StaticName=`"Bezug`" DisplayName=`"Bezug (Ü/X)`" Format=`"Dropdown`"><CHOICES>$(ConvertTo-ChoiceXml @('Ü','X','fix'))</CHOICES></Field>"
 Add-DHOFeld $ListeAufgaben 'OffsetTage' '<Field Type="Number" Name="OffsetTage" StaticName="OffsetTage" DisplayName="Offset Tage" Decimals="0" />'
 Add-DHOFeld $ListeAufgaben 'Frist'      '<Field Type="DateTime" Name="Frist" StaticName="Frist" DisplayName="Bis wann?" Format="DateOnly" Indexed="TRUE" />'

@@ -324,7 +324,7 @@
       </div>
       <div class="tablewrap">
         <table class="data">
-          <thead><tr><th>Haus</th><th>Nr.</th><th>Bereich</th><th>Was ist zu tun?</th><th>Wen frage ich?</th><th>Bis wann?</th><th>Status</th><th>Antwort / Notiz</th></tr></thead>
+          <thead><tr><th>Haus</th><th>Nr.</th><th>Bereich</th><th>Was ist zu tun?</th><th>Zuständig / Ansprechpartner</th><th>Bis wann?</th><th>Status</th><th>Antwort / Notiz</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
@@ -359,7 +359,7 @@
       <p class="muted small" style="margin-top:-4px">Änderungen an der Vorlage gelten für neu angelegte Häuser. Bestehende Checklisten bleiben unverändert. Inaktive Punkte werden nicht übernommen.</p>
       <div class="tablewrap">
         <table class="data">
-          <thead><tr><th>Nr.</th><th>Was ist zu tun?</th><th>Wen frage ich?</th><th>Bezug</th><th>Offset</th><th>Frist-Text</th><th>Hinweis</th><th>Aktiv</th></tr></thead>
+          <thead><tr><th>Nr.</th><th>Was ist zu tun?</th><th>Zuständig / Ansprechpartner</th><th>Bezug</th><th>Offset</th><th>Frist-Text</th><th>Hinweis</th><th>Aktiv</th></tr></thead>
           <tbody id="vbody"></tbody>
         </table>
       </div>
@@ -696,7 +696,7 @@ function renderAufgaben() {
   const keepH = $('#fHaus').value, keepO = $('#fOwner').value;
   $('#fHaus').innerHTML = '<option value="">Alle Häuser</option>' + state.houses.map(h => `<option value="${h.id}" ${String(h.id) === keepH ? 'selected' : ''}>${esc(h.ort)}</option>`).join('');
   const owners = [...new Set(state.tasks.flatMap(t => splitOwners(t.owner)))].sort((a, b) => a.localeCompare(b, 'de'));
-  $('#fOwner').innerHTML = '<option value="">Alle Verantwortlichen</option>' + owners.map(o => `<option ${o === keepO ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  $('#fOwner').innerHTML = '<option value="">Alle Zuständigen</option>' + owners.map(o => `<option ${o === keepO ? 'selected' : ''}>${esc(o)}</option>`).join('');
   renderTable();
 }
 function renderTable() {
@@ -875,7 +875,7 @@ function taskForm(t, isNew) {
       { k: 'nr', label: 'Nr.', type: 'number' },
       { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
       { k: 'bereich', label: 'Bereich', list: 'dlBereich' },
-      { k: 'owner', label: 'Wen frage ich?', list: 'dlOwner' },
+      { k: 'owner', label: 'Zuständig / Ansprechpartner', list: 'dlOwner' },
       { k: 'status', label: 'Status', type: 'select', options: STATUS },
       { k: 'erledigtAm', label: 'Erledigt am', type: 'date', help: 'wird beim Status „erledigt“ automatisch gesetzt' },
       { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
@@ -961,7 +961,7 @@ function vorlageForm(v, isNew) {
       { k: 'nr', label: 'Nr.', type: 'number', req: true },
       { k: 'bereich', label: 'Bereich', list: 'dlBereich', req: true },
       { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
-      { k: 'owner', label: 'Wen frage ich?', list: 'dlOwner' },
+      { k: 'owner', label: 'Zuständig / Ansprechpartner', list: 'dlOwner' },
       { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
       { k: 'offset', label: 'Offset Tage', type: 'number', help: 'negativ = vor dem Termin' },
       { k: 'fristText', label: 'Frist-Text (bei „fix“)', placeholder: 'z. B. sofort, laufend' },
@@ -1259,7 +1259,7 @@ function exportHouseXlsx(h) {
   const aoa = [[`IT-Checkliste Hotelübernahme: ${h.name}`], [], [],
     [null, 'Hotel', h.name], [null, 'Ort', h.ort], [null, 'Übernahmetag', h.ue], [null, 'Go-Live neues Hotelsystem', h.x],
     [null, 'Direktor/in', h.direktor], [null, 'PMS Champion', h.pms], [null, 'Oracle-Projektleitung', h.oracle], [null, 'Accor-Ansprechpartner', h.accor], [], [],
-    ['Nr.', 'Was ist zu tun?', 'Wen frage ich?', 'Bis wann?', 'Erledigt?', 'Antwort / Notiz', 'Hinweis', 'Bezug', 'Offset']];
+    ['Nr.', 'Was ist zu tun?', 'Zuständig / Ansprechpartner', 'Bis wann?', 'Erledigt?', 'Antwort / Notiz', 'Hinweis', 'Bezug', 'Offset']];
   let b = null;
   for (const t of tasksOf(h).sort((a, c) => a.nr - c.nr)) {
     if (t.bereich !== b) { aoa.push([t.bereich]); b = t.bereich; }
