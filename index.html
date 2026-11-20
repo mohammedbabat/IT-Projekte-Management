@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DHO Hotelübernahmen – IT-Dashboard</title>
+<title>DHO Hotelübernahmen – IT-Projektmanagement</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="lib/msal-browser.min.js"></script>
 <style>
@@ -46,21 +46,34 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--surface-0); color: var(--text-primary); }
-  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 18px 28px; background: var(--surface-1); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  header { background: var(--surface-1); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  .topbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 28px 10px; }
   header h1 { font-size: 19px; margin: 0; font-weight: 600; }
   header .sub { color: var(--text-secondary); font-size: 13px; }
+  nav { display: flex; gap: 2px; padding: 0 22px; }
+  nav a { padding: 9px 14px; color: var(--text-secondary); text-decoration: none; border-bottom: 2px solid transparent; font-weight: 500; }
+  nav a:hover { color: var(--text-primary); }
+  nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
   main { padding: 20px 28px 60px; max-width: 1500px; margin: 0 auto; }
-  button, .btn { font: inherit; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); padding: 7px 14px; border-radius: 6px; cursor: pointer; }
+  button, .btn { font: inherit; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); padding: 7px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:hover { filter: brightness(.97); }
-  input, select { font: inherit; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary); }
+  button.danger { color: var(--critical); border-color: var(--critical); }
+  button.small { padding: 3px 9px; font-size: 12px; }
+  button:disabled { opacity: .55; cursor: wait; }
+  button:hover:not(:disabled) { filter: brightness(.97); }
+  input, select, textarea { font: inherit; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary); }
+  textarea { resize: vertical; min-height: 64px; }
   section.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
   section.card h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .card-head h2 { margin: 0 !important; }
   .muted { color: var(--text-muted); }
   .small { font-size: 12px; }
+  .hidden { display: none !important; }
+  .banner { padding: 8px 12px; border-radius: 8px; background: var(--soon-bg); font-size: 13px; margin-bottom: 14px; }
 
-  /* Drop-Zone */
-  #drop { border: 2px dashed var(--border); border-radius: 12px; padding: 46px 20px; text-align: center; background: var(--surface-1); }
+  /* Start */
+  #drop { border: 2px dashed var(--border); border-radius: 12px; padding: 40px 20px; text-align: center; background: var(--surface-1); }
   #drop.over { border-color: var(--accent); }
   #drop h2 { margin: 0 0 8px; font-size: 18px; }
   #drop p { margin: 4px 0; color: var(--text-secondary); }
@@ -73,26 +86,25 @@
   .kpi .hint { color: var(--text-muted); font-size: 12px; }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 
-  /* Häuser */
+  /* Häuser-Karten */
   .houses { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
   .house { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; background: var(--surface-1); }
   .house:hover { border-color: var(--accent); }
-  .house.sel { outline: 2px solid var(--accent); }
   .house h3 { margin: 0; font-size: 15px; }
   .house .full { color: var(--text-muted); font-size: 12px; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .house .dates { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
   .house .dates b { color: var(--text-primary); font-weight: 600; }
   .pct { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .bar { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; background: var(--surface-1); margin: 6px 0 8px; }
+  .bar.thin { height: 8px; margin: 3px 0; min-width: 120px; }
   .bar span { height: 100%; }
   .bar span:first-child { border-radius: 4px 0 0 4px; }
   .bar span:last-child { border-radius: 0 4px 4px 0; }
   .counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-secondary); }
-  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--grid); color: var(--text-secondary); }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--grid); color: var(--text-secondary); font-weight: 500; }
   .badge.crit { background: var(--overdue-bg); color: var(--overdue-fg); }
   .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
 
-  /* Timeline + Heatmap */
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
   @media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr; } }
   svg text { fill: var(--text-secondary); font-size: 12px; }
@@ -100,79 +112,103 @@
   .heat th { font-weight: 500; color: var(--text-secondary); text-align: left; padding: 4px 6px; white-space: nowrap; }
   .heat td { text-align: center; padding: 6px 4px; border-radius: 4px; font-variant-numeric: tabular-nums; cursor: default; }
 
-  /* Tabelle */
+  /* Tabellen */
   .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; }
   .filters input[type=search] { min-width: 240px; }
-  .tablewrap { max-height: 620px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
-  table.tasks { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.tasks th { position: sticky; top: 0; background: var(--surface-1); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
-  table.tasks td { padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
-  table.tasks tr:hover td { background: var(--surface-0); }
+  .tablewrap { max-height: 640px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data th { position: sticky; top: 0; background: var(--surface-1); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 600; white-space: nowrap; z-index: 1; }
+  table.data td { padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  table.data tr.click { cursor: pointer; }
+  table.data tr.click:hover td { background: var(--surface-0); }
+  table.data tr.group td { background: var(--surface-0); font-weight: 600; color: var(--text-secondary); }
   td.frist { white-space: nowrap; font-variant-numeric: tabular-nums; }
   td.frist.over { color: var(--overdue-fg); background: var(--overdue-bg); font-weight: 600; }
   td.frist.soon { background: var(--soon-bg); }
-  .st { padding: 1px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
+  select.st { padding: 2px 6px; border-radius: 10px; font-size: 12px; border-color: transparent; }
   .st-erledigt { background: #dff6dd; color: #0b5a0b; }
   .st-offen { background: var(--grid); color: var(--text-secondary); }
   .st-prüfen, .st-klären { background: #fff4ce; color: #7a5600; }
-  .st-entfällt { background: var(--grid); color: var(--text-muted); text-decoration: line-through; }
+  .st-entfällt { background: var(--grid); color: var(--text-muted); }
   .note { color: var(--text-muted); font-size: 12px; max-width: 420px; }
+  .inactive td { opacity: .5; }
 
-  /* Termine */
   .termine { width: 100%; border-collapse: collapse; font-size: 13px; }
   .termine td { padding: 6px 8px; border-bottom: 1px solid var(--grid); }
   .termine td:first-child { white-space: nowrap; font-weight: 600; width: 90px; }
 
-  /* Generator */
-  .gen { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 12px; }
-  .gen label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+  /* Formulare */
+  .form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 14px; }
+  .form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+  .form label.span2 { grid-column: span 2; }
+  .form label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+  .form .req::after { content: " *"; color: var(--critical); }
+  @media (max-width: 700px) { .form { grid-template-columns: 1fr; } .form label.span2 { grid-column: span 1; } }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 0; width: min(760px, 94vw); background: var(--surface-1); color: var(--text-primary); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog .dhead { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  dialog .dhead h3 { margin: 0; font-size: 16px; }
+  dialog .dbody { padding: 18px 20px; max-height: 68vh; overflow: auto; }
+  dialog .dfoot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+  dialog .dmsg { font-size: 12px; color: var(--critical); }
+  .inline-btn { font-size: 11px; padding: 2px 8px; margin-left: 6px; }
 
   #tip { position: fixed; pointer-events: none; background: var(--text-primary); color: var(--surface-1); padding: 6px 10px; border-radius: 6px; font-size: 12px; max-width: 320px; z-index: 50; display: none; white-space: pre-line; }
-  .hidden { display: none !important; }
-  .privacy { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--surface-1); padding: 10px 18px; border-radius: 8px; font-size: 13px; z-index: 60; display: none; max-width: 90vw; }
+  #toast.err { background: var(--critical); color: #fff; }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>DHO Hotelübernahmen – IT-Dashboard</h1>
-    <div class="sub" id="stand">Keine Daten geladen</div>
+  <div class="topbar">
+    <div>
+      <h1>DHO Hotelübernahmen – IT-Projektmanagement</h1>
+      <div class="sub" id="stand">Keine Daten geladen</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="btnLive" class="primary">Live aus SharePoint</button>
+      <button id="btnRefresh" class="hidden" title="Daten neu aus SharePoint laden">↻ Aktualisieren</button>
+      <label class="btn" for="file">Excel/CSV laden</label>
+      <input type="file" id="file" accept=".xlsx,.xlsm,.csv" multiple class="hidden">
+      <button id="btnForget" class="hidden" title="Lokale Daten aus diesem Browser löschen">Lokale Daten löschen</button>
+    </div>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <button id="btnLive" class="primary">Live aus SharePoint</button>
-    <button id="btnRefresh" class="hidden" title="Daten neu aus SharePoint laden">↻ Aktualisieren</button>
-    <label class="btn" for="file">Excel/CSV laden</label>
-    <input type="file" id="file" accept=".xlsx,.xlsm,.csv" multiple class="hidden">
-    <button id="btnForget" class="hidden" title="Gespeicherte Daten aus diesem Browser löschen">Daten vergessen</button>
-  </div>
+  <nav id="nav" class="hidden">
+    <a href="#/uebersicht" data-route="uebersicht">Übersicht</a>
+    <a href="#/aufgaben" data-route="aufgaben">Aufgaben</a>
+    <a href="#/haeuser" data-route="haeuser">Häuser</a>
+    <a href="#/vorlage" data-route="vorlage">Vorlage</a>
+  </nav>
 </header>
 
 <main>
-  <section class="card" id="liveStart">
-    <h2>Live aus SharePoint (empfohlen)</h2>
-    <p class="muted small" style="margin-top:-6px">Liest die Listen „DHO Häuser“, „DHO Aufgaben“ und „DHO Checkliste Vorlage“ direkt mit deiner Microsoft-Anmeldung. Es werden keine Daten gespeichert oder hochgeladen.</p>
-    <div class="gen">
-      <label>Tenant-ID<input id="cTenant" placeholder="xxxxxxxx-xxxx-…"></label>
-      <label>Client-ID (App-Registrierung)<input id="cClient" placeholder="xxxxxxxx-xxxx-…"></label>
-      <label style="grid-column: span 2">SharePoint-Site<input id="cSite" placeholder="https://<tenant>.sharepoint.com/sites/<site>"></label>
+  <!-- ================= Start ================= -->
+  <div id="start">
+    <section class="card" id="liveStart">
+      <h2>Live aus SharePoint (empfohlen)</h2>
+      <p class="muted small" style="margin-top:-6px">Liest und speichert direkt in den Listen „DHO Häuser“, „DHO Aufgaben“ und „DHO Checkliste Vorlage“ – mit deiner Microsoft-Anmeldung und deinen SharePoint-Rechten.</p>
+      <div class="form" style="margin-bottom:12px">
+        <label>Tenant-ID<input id="cTenant" placeholder="xxxxxxxx-xxxx-… oder firma.onmicrosoft.com"></label>
+        <label>Client-ID (App-Registrierung)<input id="cClient" placeholder="xxxxxxxx-xxxx-…"></label>
+        <label class="span2">SharePoint-Site<input id="cSite" placeholder="https://<tenant>.sharepoint.com/sites/<site>"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="primary" id="cConnect">Anmelden und laden</button>
+        <span class="muted small" id="cMsg"></span>
+      </div>
+    </section>
+    <div id="drop">
+      <h2>… oder Checklisten-Datei hierher ziehen</h2>
+      <p><b>IT-Checklisten_Standorte.xlsx</b> (ein Blatt pro Haus + Blatt „Vorlage“), optional <b>PM_Checkliste_DHO_Uebernahmen.xlsx</b></p>
+      <p class="small muted">Im Datei-Modus werden Änderungen nur in diesem Browser gespeichert. Die Dateien werden nicht hochgeladen.</p>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="primary" id="cConnect">Anmelden und laden</button>
-      <span class="muted small" id="cMsg"></span>
-    </div>
-  </section>
-
-  <div id="drop">
-    <h2>… oder Checklisten-Datei hierher ziehen</h2>
-    <p><b>IT-Checklisten_Standorte.xlsx</b> (ein Blatt pro Haus + Blatt „Vorlage“)</p>
-    <p>optional zusätzlich: <b>PM_Checkliste_DHO_Uebernahmen.xlsx</b> (für „Nächste Termine“)</p>
-    <p>oder CSV-Export: DHO_Haeuser.csv + DHO_Aufgaben_Bestand.csv</p>
-    <p class="privacy">🔒 Die Dateien werden nur in deinem Browser gelesen und nirgendwo hochgeladen.</p>
   </div>
 
-  <div id="app" class="hidden">
-    <div class="kpis" id="kpis"></div>
+  <div id="localBanner" class="banner hidden">⚠ Lokaler Modus: Änderungen werden nur in diesem Browser gespeichert. Für gemeinsame Daten „Live aus SharePoint“ verwenden.</div>
 
+  <!-- ================= Übersicht ================= -->
+  <div id="page-uebersicht" class="page hidden">
+    <div class="kpis" id="kpis"></div>
     <section class="card">
       <h2>Fortschritt je Haus</h2>
       <div class="legend">
@@ -183,13 +219,10 @@
       </div>
       <div class="houses" id="houses"></div>
     </section>
-
     <div class="grid2">
       <section class="card">
         <h2>Zeitplan: Übernahme (Ü) und Go-Live (X)</h2>
-        <div class="legend">
-          <span>● Übernahmetag</span><span>◆ Go-Live Hotelsystem</span><span style="color:var(--critical)">│ heute</span>
-        </div>
+        <div class="legend"><span>● Übernahmetag</span><span>◆ Go-Live Hotelsystem</span><span style="color:var(--critical)">│ heute</span></div>
         <div id="timeline"></div>
       </section>
       <section class="card">
@@ -197,14 +230,19 @@
         <div id="heat"></div>
       </section>
     </div>
-
     <section class="card" id="termineCard">
       <h2>Nächste Termine</h2>
       <div id="termine"></div>
     </section>
+  </div>
 
+  <!-- ================= Aufgaben ================= -->
+  <div id="page-aufgaben" class="page hidden">
     <section class="card">
-      <h2>Aufgaben</h2>
+      <div class="card-head">
+        <h2>Aufgaben</h2>
+        <button class="primary" id="btnNewTask">+ Neue Aufgabe</button>
+      </div>
       <div class="filters">
         <select id="fHaus"></select>
         <select id="fStatus">
@@ -220,58 +258,97 @@
         <span class="muted small" id="fCount"></span>
       </div>
       <div class="tablewrap">
-        <table class="tasks">
+        <table class="data">
           <thead><tr><th>Haus</th><th>Nr.</th><th>Bereich</th><th>Was ist zu tun?</th><th>Wen frage ich?</th><th>Bis wann?</th><th>Status</th><th>Antwort / Notiz</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <p class="muted small">Status direkt in der Tabelle ändern · Zeile anklicken für alle Details</p>
     </section>
+  </div>
 
+  <!-- ================= Häuser ================= -->
+  <div id="page-haeuser" class="page hidden">
     <section class="card">
-      <h2>Neues Haus → Standort-Checkliste erzeugen</h2>
-      <p class="muted small" style="margin-top:-6px">Erzeugt aus dem Blatt „Vorlage“ eine komplette Checkliste. Alle Fristen werden aus Übernahmetag (Ü) und Go-Live (X) berechnet. Ergebnis als Excel-Blatt oder als CSV für den SharePoint-Import.</p>
-      <div class="gen">
-        <label>Hotelname<input id="gName" placeholder="z. B. Mercure Hotel …"></label>
-        <label>Ort<input id="gOrt" placeholder="z. B. Bremen"></label>
-        <label>Übernahmetag (Ü)<input id="gUe" type="date"></label>
-        <label>Go-Live Hotelsystem (X)<input id="gX" type="date"></label>
-        <label>Direktor/in<input id="gDir"></label>
-        <label>Oracle-Projektleitung<input id="gOra"></label>
+      <div class="card-head">
+        <h2>Häuser</h2>
+        <button class="primary" id="btnNewHouse">+ Neues Haus</button>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="primary" id="gAdd">Ins Dashboard übernehmen</button>
-        <button id="gXlsx">Als Excel-Blatt herunterladen</button>
-        <button id="gCsv">Als CSV (SharePoint) herunterladen</button>
+      <div class="tablewrap">
+        <table class="data">
+          <thead><tr><th>Ort</th><th>Hotelname</th><th>Kürzel</th><th>Übernahme (Ü)</th><th>Go-Live (X)</th><th>Direktor/in</th><th>Projektstatus</th><th>Fortschritt</th><th></th></tr></thead>
+          <tbody id="hbody"></tbody>
+        </table>
       </div>
-      <div id="gMsg" class="muted small" style="margin-top:8px"></div>
+      <p class="muted small">Neues Haus anlegen → die komplette Standort-Checkliste wird automatisch aus der Vorlage erzeugt, alle Fristen aus Ü und X berechnet.</p>
+    </section>
+  </div>
+
+  <!-- ================= Vorlage ================= -->
+  <div id="page-vorlage" class="page hidden">
+    <section class="card">
+      <div class="card-head">
+        <h2>Checklisten-Vorlage</h2>
+        <button class="primary" id="btnNewVorlage">+ Neuer Vorlagenpunkt</button>
+      </div>
+      <p class="muted small" style="margin-top:-4px">Änderungen an der Vorlage gelten für neu angelegte Häuser. Bestehende Checklisten bleiben unverändert. Inaktive Punkte werden nicht übernommen.</p>
+      <div class="tablewrap">
+        <table class="data">
+          <thead><tr><th>Nr.</th><th>Was ist zu tun?</th><th>Wen frage ich?</th><th>Bezug</th><th>Offset</th><th>Frist-Text</th><th>Hinweis</th><th>Aktiv</th></tr></thead>
+          <tbody id="vbody"></tbody>
+        </table>
+      </div>
     </section>
   </div>
 </main>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm">
+    <div class="dhead"><h3 id="dlgTitle"></h3><button type="button" class="small" id="dlgX" title="Schließen">✕</button></div>
+    <div class="dbody"><div class="form" id="dlgFields"></div><div id="dlgExtra"></div></div>
+    <div class="dfoot">
+      <div><button type="button" class="danger hidden" id="dlgDelete">Löschen</button></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="dmsg" id="dlgMsg"></span>
+        <button type="button" id="dlgCancel">Abbrechen</button>
+        <button type="submit" class="primary" id="dlgSave">Speichern</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<datalist id="dlOwner"></datalist>
+<datalist id="dlBereich"></datalist>
 <div id="tip"></div>
+<div id="toast"></div>
 
 <script>
 'use strict';
-// ------------------------------------------------------------------
-// Zustand
-// ------------------------------------------------------------------
-const STORE_KEY = 'dho-dashboard-v1';
+// ==================================================================
+// Grundlagen
+// ==================================================================
+const STORE_KEY = 'dho-dashboard-v2';
 const OPEN = ['offen', 'prüfen', 'klären'];
-let state = { houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [] };
-let selectedHouse = '';
+const STATUS = ['offen', 'prüfen', 'klären', 'erledigt', 'entfällt'];
+const PROJEKTSTATUS = ['in Vorbereitung', 'übernommen', 'live', 'abgeschlossen'];
+const emptyState = () => ({ houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [], live: null });
+let state = emptyState();
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nextId = arr => arr.reduce((m, x) => Math.max(m, +x.id || 0), 0) + 1;
 
-// ------------------------------------------------------------------
-// Datum-Helfer (alles als lokales Datum ohne Uhrzeit)
-// ------------------------------------------------------------------
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', err ? 7000 : 3000);
+}
+
+// Datum (immer lokales Datum ohne Uhrzeit)
 const today = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
 const DAY = 864e5;
-function fromSerial(n) { return new Date(1899, 11, 30 + Math.floor(n)); }
 function toDate(v) {
   if (v == null || v === '') return null;
-  if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
-  if (typeof v === 'number' && v > 20000 && v < 80000) return fromSerial(v);
+  if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(1899, 11, 30 + Math.floor(v));
   if (typeof v === 'string') {
     let m = v.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], m[2] - 1, +m[3]);
     m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m) return new Date(+m[3], m[2] - 1, +m[1]);
@@ -283,6 +360,7 @@ const fmt = d => d ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-d
 const fmtShort = d => d ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
 const iso = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 const daysUntil = d => Math.round((d - today) / DAY);
+const numOrEmpty = v => (v === null || v === undefined || v === '' || isNaN(+v)) ? '' : +v;
 
 function calcFrist(bezug, offset, ue, x) {
   if (offset === '' || offset == null || isNaN(offset)) return null;
@@ -290,11 +368,12 @@ function calcFrist(bezug, offset, ue, x) {
   if (bezug === 'X' && x) return addDays(x, +offset);
   return null;
 }
-const normStatus = s => { s = String(s || 'offen').trim().toLowerCase(); return ['offen', 'prüfen', 'klären', 'erledigt', 'entfällt'].includes(s) ? s : (s === '–' || s === '-' ? 'entfällt' : 'offen'); };
+const normStatus = s => { s = String(s || 'offen').trim().toLowerCase(); return STATUS.includes(s) ? s : (s === '–' || s === '-' ? 'entfällt' : 'offen'); };
+const houseOf = t => state.houses.find(h => h.id === t.hausId) || state.houses.find(h => h.ort === t.haus);
 
-// ------------------------------------------------------------------
-// Excel einlesen
-// ------------------------------------------------------------------
+// ==================================================================
+// Excel / CSV einlesen (lokaler Modus)
+// ==================================================================
 function parseChecklistSheet(rows) {
   const hdr = rows.findIndex(r => r && r[0] === 'Nr.' && String(r[1] || '').startsWith('Was ist'));
   if (hdr < 0) return null;
@@ -305,59 +384,56 @@ function parseChecklistSheet(rows) {
     const r = rows[i] || [];
     if (typeof r[0] === 'string' && r[0].trim() && (r[1] == null || r[1] === '')) { bereich = r[0].trim(); continue; }
     if (typeof r[0] !== 'number') continue;
-    const bezug = (r[7] === 'Ü' || r[7] === 'X') ? r[7] : 'fix';
     tasks.push({
-      nr: r[0], bereich, aufgabe: r[1] || '', owner: r[2] || '',
-      fristRaw: r[3], status: normStatus(r[4]), notiz: r[5] || '', hinweis: r[6] || '',
-      bezug, offset: (r[8] === null || r[8] === undefined || r[8] === '') ? '' : +r[8]
+      nr: r[0], bereich, aufgabe: r[1] || '', owner: r[2] || '', fristRaw: r[3], status: normStatus(r[4]),
+      notiz: r[5] || '', hinweis: r[6] || '', bezug: (r[7] === 'Ü' || r[7] === 'X') ? r[7] : 'fix', offset: numOrEmpty(r[8])
     });
   }
   return { meta, tasks };
 }
-
 function parseTermine(rows) {
   const i = rows.findIndex(r => r && r[0] === 'Datum' && r[1] === 'Haus');
   if (i < 0) return [];
   const out = [];
   for (let j = i + 1; j < rows.length; j++) {
-    const r = rows[j] || [];
-    if (!r[0] && !r[2]) break;
+    const r = rows[j] || []; if (!r[0] && !r[2]) break;
     out.push({ datum: String(r[0] ?? ''), haus: String(r[1] ?? ''), was: String(r[2] ?? '') });
   }
   return out;
 }
-
-function ingestWorkbook(wb, fileName) {
+function ingestWorkbook(wb) {
   let found = 0;
   for (const name of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
     if (name.startsWith('Überblick')) { const t = parseTermine(rows); if (t.length) state.termine = t; continue; }
     if (name === 'Beispiel') continue;
-    const p = parseChecklistSheet(rows);
-    if (!p) continue;
-    if (name === 'Vorlage') { state.vorlage = p.tasks.map(t => ({ ...t, status: 'offen', notiz: '', fristRaw: typeof t.fristRaw === 'string' ? t.fristRaw : null })); continue; }
+    const p = parseChecklistSheet(rows); if (!p) continue;
+    if (name === 'Vorlage') {
+      state.vorlage = p.tasks.map((t, i) => ({ id: i + 1, nr: t.nr, bereich: t.bereich, aufgabe: t.aufgabe, owner: t.owner, bezug: t.bezug, offset: t.offset, fristText: typeof t.fristRaw === 'string' ? t.fristRaw : '', hinweis: t.hinweis, aktiv: true }));
+      continue;
+    }
     const ort = String(p.meta['Ort'] || name).trim();
-    const ue = toDate(p.meta['Übernahmetag']);
-    const x = toDate(p.meta['Go-Live neues Hotelsystem']);
-    const house = {
-      ort, name: String(p.meta['Hotel'] || ort), ue, x,
-      direktor: p.meta['Direktor/in'] || '', oracle: p.meta['Oracle-Projektleitung'] || '',
-      quelle: fileName
-    };
-    state.houses = state.houses.filter(h => h.ort !== ort);
-    state.tasks = state.tasks.filter(t => t.haus !== ort);
-    state.houses.push(house);
+    let house = state.houses.find(h => h.ort === ort);
+    if (house) state.tasks = state.tasks.filter(t => t.hausId !== house.id);
+    else { house = { id: nextId(state.houses) }; state.houses.push(house); }
+    Object.assign(house, {
+      ort, name: String(p.meta['Hotel'] || ort), kuerzel: '', ue: toDate(p.meta['Übernahmetag']), x: toDate(p.meta['Go-Live neues Hotelsystem']),
+      direktor: p.meta['Direktor/in'] || '', pms: p.meta['PMS Champion'] || '', oracle: p.meta['Oracle-Projektleitung'] || '',
+      accor: p.meta['Accor-Ansprechpartner'] || '', projektstatus: 'in Vorbereitung', checkliste: true
+    });
+    let id = nextId(state.tasks);
     for (const t of p.tasks) {
-      const frist = toDate(t.fristRaw) || calcFrist(t.bezug, t.offset, ue, x);
-      state.tasks.push({ ...t, haus: ort, frist, fristText: typeof t.fristRaw === 'string' ? t.fristRaw : '' });
+      state.tasks.push({
+        id: id++, hausId: house.id, haus: ort, nr: t.nr, bereich: t.bereich, aufgabe: t.aufgabe, owner: t.owner, bezug: t.bezug, offset: t.offset,
+        frist: toDate(t.fristRaw) || calcFrist(t.bezug, t.offset, house.ue, house.x), fristText: typeof t.fristRaw === 'string' ? t.fristRaw : '',
+        status: t.status, erledigtAm: null, notiz: t.notiz, hinweis: t.hinweis
+      });
     }
     found++;
   }
   return found;
 }
-
-// CSV aus 01_DHO-Setup (DHO_Haeuser.csv / DHO_Aufgaben_Bestand.csv)
-function ingestCsv(text, fileName) {
+function ingestCsv(text) {
   text = text.replace(/^﻿/, '');
   const wb = XLSX.read(text, { type: 'string', FS: ';', raw: true });
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
@@ -365,95 +441,112 @@ function ingestCsv(text, fileName) {
   const cols = Object.keys(rows[0]);
   if (cols.includes('Hotelname') && cols.includes('Uebernahmetag')) {
     for (const r of rows) {
-      const h = { ort: r.Ort, name: r.Hotelname, ue: toDate(r.Uebernahmetag), x: toDate(r.GoLive), direktor: r.Direktor || '', oracle: r.OraclePL || '', quelle: fileName };
-      state.houses = state.houses.filter(o => o.ort !== h.ort); state.houses.push(h);
+      let h = state.houses.find(o => o.ort === r.Ort);
+      if (!h) { h = { id: nextId(state.houses) }; state.houses.push(h); }
+      Object.assign(h, { ort: r.Ort, name: r.Hotelname, kuerzel: '', ue: toDate(r.Uebernahmetag), x: toDate(r.GoLive), direktor: r.Direktor || '', pms: r.PMSChampion || '', oracle: r.OraclePL || '', accor: r.AccorKontakt || '', projektstatus: 'in Vorbereitung', checkliste: true });
     }
-    for (const t of state.tasks) { if (!t.frist) { const h = state.houses.find(x => x.ort === t.haus); if (h) t.frist = calcFrist(t.bezug, t.offset, h.ue, h.x); } }
     return rows.length;
   }
   if (cols.includes('Ort') && cols.includes('Aufgabe')) {
-    const orte = new Set(rows.map(r => r.Ort));
-    state.tasks = state.tasks.filter(t => !orte.has(t.haus));
+    let id = nextId(state.tasks);
     for (const r of rows) {
-      const h = state.houses.find(x => x.ort === r.Ort);
-      const offset = r.OffsetTage === '' ? '' : +r.OffsetTage;
-      state.tasks.push({
-        haus: r.Ort, nr: +r.Nr, bereich: r.Bereich, aufgabe: r.Aufgabe, owner: r.Owner, bezug: r.Bezug, offset,
-        frist: toDate(r.Frist) || (h ? calcFrist(r.Bezug, offset, h.ue, h.x) : null), fristText: r.FristText || '',
-        status: normStatus(r.Status), notiz: r.Notiz || '', hinweis: r.Hinweis || ''
-      });
-      if (!state.houses.find(x => x.ort === r.Ort)) state.houses.push({ ort: r.Ort, name: r.Ort, ue: null, x: null, direktor: '', oracle: '', quelle: fileName });
+      let h = state.houses.find(x => x.ort === r.Ort);
+      if (!h) { h = { id: nextId(state.houses), ort: r.Ort, name: r.Ort, ue: null, x: null, projektstatus: 'in Vorbereitung', checkliste: true }; state.houses.push(h); }
+      const offset = numOrEmpty(r.OffsetTage);
+      state.tasks.push({ id: id++, hausId: h.id, haus: r.Ort, nr: +r.Nr, bereich: r.Bereich, aufgabe: r.Aufgabe, owner: r.Owner, bezug: r.Bezug || 'fix', offset, frist: toDate(r.Frist) || calcFrist(r.Bezug, offset, h.ue, h.x), fristText: r.FristText || '', status: normStatus(r.Status), erledigtAm: null, notiz: r.Notiz || '', hinweis: r.Hinweis || '' });
     }
-    return orte.size;
+    return rows.length;
   }
   return 0;
 }
-
 async function loadFiles(files) {
-  const msgs = [];
+  if (state.live) state = emptyState();
   for (const f of files) {
     try {
-      if (/\.csv$/i.test(f.name)) { const n = ingestCsv(await f.text(), f.name); msgs.push(`${f.name}: ${n} Einträge`); }
-      else { const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }); const n = ingestWorkbook(wb, f.name); msgs.push(`${f.name}: ${n} Häuser`); }
+      if (/\.csv$/i.test(f.name)) ingestCsv(await f.text());
+      else ingestWorkbook(XLSX.read(await f.arrayBuffer(), { type: 'array' }));
       if (!state.files.includes(f.name)) state.files.push(f.name);
-    } catch (e) { console.error(e); alert(`Datei ${f.name} konnte nicht gelesen werden:\n${e.message}`); }
+    } catch (e) { console.error(e); toast(`Datei ${f.name} konnte nicht gelesen werden: ${e.message}`, true); }
   }
   state.loadedAt = new Date();
-  state.houses.sort((a, b) => (a.ue || a.x || new Date(9e15)) - (b.ue || b.x || new Date(9e15)));
-  save(); render();
+  sortHouses(); save(); render();
 }
+const sortHouses = () => state.houses.sort((a, b) => (a.ue || a.x || new Date(9e15)) - (b.ue || b.x || new Date(9e15)));
 
-// ------------------------------------------------------------------
-// Speichern im Browser (nur lokal)
-// ------------------------------------------------------------------
+// Lokales Speichern (nur Datei-/Vorschau-Modus)
 function save() {
-  if (state.live) return; // Live-Daten werden nicht im Browser gespeichert
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* Speicher nicht verfügbar */ }
+  if (state.live) return;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { }
+}
+function revive(s) {
+  const d = v => v ? toDate(String(v).slice(0, 10)) : null;
+  s.houses.forEach(h => { h.ue = d(h.ue); h.x = d(h.x); });
+  s.tasks.forEach(t => { t.frist = d(t.frist); t.erledigtAm = d(t.erledigtAm); });
+  s.loadedAt = s.loadedAt ? new Date(s.loadedAt) : null;
+  return s;
 }
 function restore() {
   try {
     const raw = localStorage.getItem(STORE_KEY); if (!raw) return false;
-    const s = JSON.parse(raw);
-    const d = v => v ? toDate(v.slice(0, 10)) : null;
-    s.houses.forEach(h => { h.ue = d(h.ue); h.x = d(h.x); });
-    s.tasks.forEach(t => { t.frist = d(t.frist); });
-    s.loadedAt = s.loadedAt ? new Date(s.loadedAt) : null;
-    state = s; return state.houses.length > 0;
+    state = Object.assign(emptyState(), revive(JSON.parse(raw)));
+    return state.houses.length > 0;
   } catch (e) { return false; }
 }
 
-// ------------------------------------------------------------------
+// ==================================================================
 // Kennzahlen
-// ------------------------------------------------------------------
+// ==================================================================
 const isOverdue = t => OPEN.includes(t.status) && t.frist && t.frist < today;
 function stats(tasks) {
   const rel = tasks.filter(t => t.status !== 'entfällt');
   const done = rel.filter(t => t.status === 'erledigt').length;
   const over = rel.filter(isOverdue).length;
   const review = rel.filter(t => (t.status === 'prüfen' || t.status === 'klären') && !isOverdue(t)).length;
-  const open = rel.length - done - over - review;
   const next7 = rel.filter(t => OPEN.includes(t.status) && t.frist && t.frist >= today && t.frist <= addDays(today, 7)).length;
-  return { total: rel.length, done, over, review, open, next7, pct: rel.length ? done / rel.length : 0 };
+  return { total: rel.length, done, over, review, open: rel.length - done - over - review, next7, pct: rel.length ? done / rel.length : 0 };
 }
+const tasksOf = h => state.tasks.filter(t => t.hausId === h.id);
+const progressBar = (s, cls = '') => {
+  const seg = (n, c, l) => n ? `<span style="flex:${n};background:${c}" data-tip="${l}: ${n}"></span>` : '';
+  return `<div class="bar ${cls}">${seg(s.done, 'var(--good)', 'erledigt')}${seg(s.review, 'var(--warning)', 'prüfen / klären')}${seg(s.over, 'var(--critical)', 'überfällig')}${seg(s.open, 'var(--neutral)', 'offen')}</div>`;
+};
 
-// ------------------------------------------------------------------
-// Rendering
-// ------------------------------------------------------------------
+// ==================================================================
+// Navigation
+// ==================================================================
+const ROUTES = ['uebersicht', 'aufgaben', 'haeuser', 'vorlage'];
+const route = () => { const r = (location.hash.match(/^#\/(\w+)/) || [])[1]; return ROUTES.includes(r) ? r : 'uebersicht'; };
+window.addEventListener('hashchange', () => render());
+
 function render() {
-  const has = state.houses.length > 0;
-  $('#drop').classList.toggle('hidden', has);
-  $('#liveStart').classList.toggle('hidden', has);
-  $('#app').classList.toggle('hidden', !has);
+  const has = state.houses.length > 0 || state.vorlage.length > 0;
+  $('#start').classList.toggle('hidden', has);
+  $('#nav').classList.toggle('hidden', !has);
+  $('#localBanner').classList.toggle('hidden', !has || !!state.live);
   $('#btnForget').classList.toggle('hidden', !has || !!state.live);
   $('#btnRefresh').classList.toggle('hidden', !state.live);
   $('#btnLive').classList.toggle('hidden', !!state.live);
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   if (!has) { $('#stand').textContent = 'Keine Daten geladen'; return; }
-  const quelle = state.live ? `SharePoint live (${state.live})` : state.files.join(', ');
+  const quelle = state.live ? `SharePoint live (${state.live})` : (state.files.join(', ') || 'lokal');
   $('#stand').textContent = `Stand: ${state.loadedAt ? state.loadedAt.toLocaleString('de-DE') : '–'} · Quelle: ${quelle} · heute ${fmt(today)}`;
-  renderKpis(); renderHouses(); renderTimeline(); renderHeat(); renderTermine(); renderFilters(); renderTable();
+  const r = route();
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.route === r));
+  $('#page-' + r).classList.remove('hidden');
+  updateDatalists();
+  ({ uebersicht: renderUebersicht, aufgaben: renderAufgaben, haeuser: renderHaeuser, vorlage: renderVorlage })[r]();
+}
+function updateDatalists() {
+  const owners = [...new Set(state.tasks.concat(state.vorlage).map(t => t.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const bereiche = [...new Set(state.vorlage.concat(state.tasks).map(t => t.bereich).filter(Boolean))];
+  $('#dlOwner').innerHTML = owners.map(o => `<option value="${esc(o)}">`).join('');
+  $('#dlBereich').innerHTML = bereiche.map(o => `<option value="${esc(o)}">`).join('');
 }
 
-function renderKpis() {
+// ==================================================================
+// Seite: Übersicht
+// ==================================================================
+function renderUebersicht() {
   const s = stats(state.tasks);
   const nextGoLive = state.houses.filter(h => h.x && h.x >= today).sort((a, b) => a.x - b.x)[0];
   $('#kpis').innerHTML = [
@@ -464,84 +557,84 @@ function renderKpis() {
     ['<span class="dot" style="background:var(--warning)"></span>prüfen / klären', s.review, 'noch nicht überfällig'],
     ['Nächster Go-Live', nextGoLive ? fmtShort(nextGoLive.x) : '–', nextGoLive ? `${nextGoLive.ort} · in ${daysUntil(nextGoLive.x)} Tagen` : 'kein Termin']
   ].map(([l, v, h]) => `<div class="kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="hint">${esc(h)}</div></div>`).join('');
-}
 
-function renderHouses() {
+  const cd = d => { if (!d) return '<span class="muted">offen</span>'; const n = daysUntil(d); return `<b>${fmt(d)}</b> <span class="muted">(${n >= 0 ? 'in ' + n : 'vor ' + (-n)} T.)</span>`; };
   $('#houses').innerHTML = state.houses.map(h => {
-    const s = stats(state.tasks.filter(t => t.haus === h.ort));
-    const seg = (n, c, l) => n ? `<span style="flex:${n};background:${c}" data-tip="${l}: ${n}"></span>` : '';
-    const cd = d => { if (!d) return '<span class="muted">offen</span>'; const n = daysUntil(d); return `<b>${fmt(d)}</b> <span class="muted">(${n >= 0 ? 'in ' + n : 'vor ' + (-n)} T.)</span>`; };
-    return `<div class="house ${selectedHouse === h.ort ? 'sel' : ''}" data-haus="${esc(h.ort)}">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <h3>${esc(h.ort)}</h3><span class="pct">${Math.round(s.pct * 100)} %</span>
-      </div>
+    const s = stats(tasksOf(h));
+    return `<div class="house" data-haus="${h.id}">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>${esc(h.ort)}</h3><span class="pct">${Math.round(s.pct * 100)} %</span></div>
       <div class="full" title="${esc(h.name)}">${esc(h.name)}</div>
       <div class="dates"><span>Ü ${cd(h.ue)}</span><span>X ${cd(h.x)}</span></div>
-      <div class="bar">${seg(s.done, 'var(--good)', 'erledigt')}${seg(s.review, 'var(--warning)', 'prüfen / klären')}${seg(s.over, 'var(--critical)', 'überfällig')}${seg(s.open, 'var(--neutral)', 'offen')}</div>
+      ${progressBar(s)}
       <div class="counts"><span>${s.done}/${s.total} erledigt</span>${s.over ? `<span class="badge crit">${s.over} überfällig</span>` : '<span class="badge">0 überfällig</span>'}<span>${s.next7} fällig in 7 T.</span></div>
     </div>`;
-  }).join('');
-}
+  }).join('') || '<p class="muted">Noch keine Häuser – unter „Häuser“ anlegen.</p>';
 
+  renderTimeline(); renderHeat();
+  // Termine: aus PM-Datei oder aus Ü/X abgeleitet
+  let termine = state.termine;
+  if (!termine.length) {
+    termine = state.houses.flatMap(h => [h.ue && { d: h.ue, haus: h.ort, was: 'Übernahme (Ü)' }, h.x && { d: h.x, haus: h.ort, was: 'Go-Live Hotelsystem (X)' }])
+      .filter(t => t && t.d >= addDays(today, -7)).sort((a, b) => a.d - b.d)
+      .map(t => ({ datum: fmtShort(t.d) + (t.d < today ? ' ✓' : ''), haus: t.haus, was: t.was + (t.d >= today ? ` · in ${daysUntil(t.d)} Tagen` : '') }));
+  }
+  $('#termineCard').classList.toggle('hidden', !termine.length);
+  $('#termine').innerHTML = `<table class="termine">${termine.map(t => `<tr><td>${esc(t.datum)}</td><td style="width:110px">${esc(t.haus)}</td><td>${esc(t.was)}</td></tr>`).join('')}</table>`;
+}
 function renderTimeline() {
   const hs = state.houses;
+  if (!hs.length) { $('#timeline').innerHTML = ''; return; }
   const dates = hs.flatMap(h => [h.ue, h.x]).filter(Boolean).concat([today]);
-  let min = addDays(new Date(Math.min(...dates)), -10), max = addDays(new Date(Math.max(...dates)), 14);
+  const min = addDays(new Date(Math.min(...dates)), -10), max = addDays(new Date(Math.max(...dates)), 14);
   const W = 640, rowH = 34, left = 96, right = 16, top = 26, H = top + hs.length * rowH + 8;
   const x = d => left + (d - min) / (max - min) * (W - left - right);
   let ticks = '';
-  for (let d = new Date(min.getFullYear(), min.getMonth() + 1, 1); d <= max; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+  for (let d = new Date(min.getFullYear(), min.getMonth() + 1, 1); d <= max; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
     ticks += `<line x1="${x(d)}" x2="${x(d)}" y1="${top - 6}" y2="${H}" stroke="var(--grid)"/><text x="${x(d) + 4}" y="${top - 10}">${d.toLocaleDateString('de-DE', { month: 'short', year: '2-digit' })}</text>`;
-  }
   const rows = hs.map((h, i) => {
     const y = top + i * rowH + rowH / 2;
     let g = `<text x="0" y="${y + 4}" style="fill:var(--text-primary)">${esc(h.ort)}</text><line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" stroke="var(--grid)"/>`;
     if (h.ue && h.x) g += `<line x1="${x(h.ue)}" x2="${x(h.x)}" y1="${y}" y2="${y}" stroke="var(--accent)" stroke-width="2"/>`;
     if (h.ue) g += `<circle cx="${x(h.ue)}" cy="${y}" r="6" fill="var(--accent)" stroke="var(--surface-1)" stroke-width="2" data-tip="${esc(h.ort)}\nÜbernahme: ${fmt(h.ue)}"/>`;
     if (h.x) { const cx = x(h.x); g += `<path d="M${cx} ${y - 8}L${cx + 8} ${y}L${cx} ${y + 8}L${cx - 8} ${y}Z" fill="var(--text-primary)" stroke="var(--surface-1)" stroke-width="2" data-tip="${esc(h.ort)}\nGo-Live: ${fmt(h.x)}"/>`; }
-    if (!h.ue && !h.x) g += `<text x="${left + 6}" y="${y + 4}" class="muted">keine Termine</text>`;
+    if (!h.ue && !h.x) g += `<text x="${left + 6}" y="${y + 4}">keine Termine</text>`;
     else if (!h.x) g += `<text x="${x(h.ue) + 12}" y="${y + 4}">Go-Live offen</text>`;
     return g;
   }).join('');
-  const tx = x(today);
-  $('#timeline').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Zeitplan der Häuser">${ticks}${rows}
-    <line x1="${tx}" x2="${tx}" y1="${top - 6}" y2="${H}" stroke="var(--critical)" stroke-width="2"/></svg>`;
+  $('#timeline').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Zeitplan der Häuser">${ticks}${rows}<line x1="${x(today)}" x2="${x(today)}" y1="${top - 6}" y2="${H}" stroke="var(--critical)" stroke-width="2"/></svg>`;
 }
-
 function renderHeat() {
   const bereiche = [...new Set((state.vorlage.length ? state.vorlage : state.tasks).map(t => t.bereich))].filter(Boolean);
   const steps = ['--seq-0', '--seq-1', '--seq-2', '--seq-3', '--seq-4', '--seq-5', '--seq-6'];
-  const cell = (ts) => {
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cell = ts => {
     const s = stats(ts);
     if (!s.total) return '<td class="muted">–</td>';
     const i = Math.min(6, Math.round(s.pct * 6));
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
     const fg = dark ? (i >= 5 ? '#0b0b0b' : 'var(--text-primary)') : (i >= 4 ? '#fff' : 'var(--text-primary)');
     return `<td style="background:var(${steps[i]});color:${fg}" data-tip="${s.done} von ${s.total} erledigt${s.over ? '\n' + s.over + ' überfällig' : ''}">${Math.round(s.pct * 100)}${s.over ? ' <span style="color:' + (i >= 4 && !dark ? '#ffd6d6' : 'var(--critical)') + '">●</span>' : ''}</td>`;
   };
   let html = `<table class="heat"><thead><tr><th>Bereich</th>${state.houses.map(h => `<th>${esc(h.ort)}</th>`).join('')}</tr></thead><tbody>`;
-  for (const b of bereiche) html += `<tr><th>${esc(b)}</th>${state.houses.map(h => cell(state.tasks.filter(t => t.haus === h.ort && t.bereich === b))).join('')}</tr>`;
-  html += '</tbody></table><div class="muted small" style="margin-top:8px">Zahl = % erledigt · <span style="color:var(--critical)">●</span> = enthält überfällige Punkte</div>';
-  $('#heat').innerHTML = html;
+  for (const b of bereiche) html += `<tr><th>${esc(b)}</th>${state.houses.map(h => cell(state.tasks.filter(t => t.hausId === h.id && t.bereich === b))).join('')}</tr>`;
+  $('#heat').innerHTML = html + '</tbody></table><div class="muted small" style="margin-top:8px">Zahl = % erledigt · <span style="color:var(--critical)">●</span> = enthält überfällige Punkte</div>';
 }
 
-function renderTermine() {
-  $('#termineCard').classList.toggle('hidden', !state.termine.length);
-  $('#termine').innerHTML = `<table class="termine">${state.termine.map(t => `<tr><td>${esc(t.datum)}</td><td style="width:110px">${esc(t.haus)}</td><td>${esc(t.was)}</td></tr>`).join('')}</table>`;
-}
-
-function renderFilters() {
-  const keepH = $('#fHaus').value || selectedHouse, keepO = $('#fOwner').value;
-  $('#fHaus').innerHTML = '<option value="">Alle Häuser</option>' + state.houses.map(h => `<option ${h.ort === keepH ? 'selected' : ''}>${esc(h.ort)}</option>`).join('');
-  const owners = [...new Set(state.tasks.flatMap(t => String(t.owner).split(/\s*[\/,]\s*|\s*→\s*/)).map(s => s.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+// ==================================================================
+// Seite: Aufgaben
+// ==================================================================
+const splitOwners = o => String(o || '').split(/\s*[\/,]\s*|\s*→\s*/).map(s => s.trim()).filter(Boolean);
+function renderAufgaben() {
+  const keepH = $('#fHaus').value, keepO = $('#fOwner').value;
+  $('#fHaus').innerHTML = '<option value="">Alle Häuser</option>' + state.houses.map(h => `<option value="${h.id}" ${String(h.id) === keepH ? 'selected' : ''}>${esc(h.ort)}</option>`).join('');
+  const owners = [...new Set(state.tasks.flatMap(t => splitOwners(t.owner)))].sort((a, b) => a.localeCompare(b, 'de'));
   $('#fOwner').innerHTML = '<option value="">Alle Verantwortlichen</option>' + owners.map(o => `<option ${o === keepO ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  renderTable();
 }
-
 function renderTable() {
   const fH = $('#fHaus').value, fS = $('#fStatus').value, fO = $('#fOwner').value, q = $('#fSearch').value.trim().toLowerCase();
-  let rows = state.tasks.filter(t => {
-    if (fH && t.haus !== fH) return false;
-    if (fO && !String(t.owner).split(/\s*[\/,]\s*|\s*→\s*/).map(s => s.trim()).includes(fO)) return false;
+  const rows = state.tasks.filter(t => {
+    if (fH && String(t.hausId) !== fH) return false;
+    if (fO && !splitOwners(t.owner).includes(fO)) return false;
     if (q && !(`${t.aufgabe} ${t.notiz} ${t.hinweis}`.toLowerCase().includes(q))) return false;
     switch (fS) {
       case 'offen-alle': return OPEN.includes(t.status);
@@ -551,78 +644,333 @@ function renderTable() {
       case 'erledigt': return t.status === 'erledigt';
       default: return true;
     }
-  });
-  rows.sort((a, b) => ((a.frist || new Date(9e15)) - (b.frist || new Date(9e15))) || a.haus.localeCompare(b.haus) || a.nr - b.nr);
+  }).sort((a, b) => ((a.frist || new Date(9e15)) - (b.frist || new Date(9e15))) || String(a.haus).localeCompare(String(b.haus)) || a.nr - b.nr);
   $('#fCount').textContent = `${rows.length} Punkte`;
   $('#tbody').innerHTML = rows.slice(0, 800).map(t => {
     const over = isOverdue(t), soon = !over && OPEN.includes(t.status) && t.frist && t.frist <= addDays(today, 7);
     const fristTxt = t.frist ? fmt(t.frist) + (over ? ` (${-daysUntil(t.frist)} T.)` : '') : esc(t.fristText || '–');
-    return `<tr><td>${esc(t.haus)}</td><td>${t.nr}</td><td class="muted small">${esc(t.bereich)}</td><td>${t.spUrl ? `<a href="${esc(t.spUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(t.aufgabe)}</a>` : esc(t.aufgabe)}${t.hinweis ? `<div class="note">💡 ${esc(t.hinweis)}</div>` : ''}</td>
+    return `<tr class="click" data-task="${t.id}"><td>${esc(t.haus)}</td><td>${t.nr}</td><td class="muted small">${esc(t.bereich)}</td>
+      <td>${esc(t.aufgabe)}${t.hinweis ? `<div class="note">💡 ${esc(t.hinweis)}</div>` : ''}</td>
       <td>${esc(t.owner)}</td><td class="frist ${over ? 'over' : soon ? 'soon' : ''}">${fristTxt}</td>
-      <td><span class="st st-${t.status}">${t.status}</span></td><td class="note">${esc(t.notiz)}</td></tr>`;
+      <td><select class="st st-${t.status}" data-status="${t.id}">${STATUS.map(s => `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+      <td class="note">${esc(t.notiz)}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="muted" style="padding:20px">Keine Punkte für diesen Filter.</td></tr>';
 }
 
-// ------------------------------------------------------------------
-// Generator: Neues Haus -> Checkliste
-// ------------------------------------------------------------------
-function buildNewHouse() {
-  if (state.live) { $('#gMsg').textContent = 'ℹ Im Live-Modus neue Häuser bitte in der SharePoint-Liste „DHO Häuser“ anlegen (bzw. per 02_Neues-Haus.ps1) – die Checkliste erscheint dann hier automatisch nach „Aktualisieren“.'; }
-  const name = $('#gName').value.trim(), ort = $('#gOrt').value.trim();
-  const ue = toDate($('#gUe').value), x = toDate($('#gX').value);
-  if (!state.vorlage.length) { $('#gMsg').textContent = '⚠ Keine Vorlage geladen – bitte IT-Checklisten_Standorte.xlsx (mit Blatt „Vorlage“) laden.'; return null; }
-  if (!ort) { $('#gMsg').textContent = '⚠ Bitte mindestens den Ort angeben.'; return null; }
-  const house = { ort, name: name || ort, ue, x, direktor: $('#gDir').value.trim(), oracle: $('#gOra').value.trim(), quelle: 'Generator' };
-  const tasks = state.vorlage.map(v => ({
-    haus: ort, nr: v.nr, bereich: v.bereich, aufgabe: v.aufgabe, owner: v.owner, bezug: v.bezug, offset: v.offset,
-    frist: calcFrist(v.bezug, v.offset, ue, x), fristText: v.bezug === 'fix' ? (v.fristRaw || '') : '',
-    status: 'offen', notiz: '', hinweis: v.hinweis
-  }));
-  const ohne = tasks.filter(t => t.bezug !== 'fix' && !t.frist).length;
-  $('#gMsg').textContent = `✔ ${tasks.length} Punkte erzeugt` + (ohne ? ` · ${ohne} ohne Frist, weil ${!ue ? 'Ü' : ''}${!ue && !x ? ' und ' : ''}${!x ? 'Go-Live' : ''} noch fehlt` : '');
-  return { house, tasks };
+// ==================================================================
+// Seite: Häuser
+// ==================================================================
+function renderHaeuser() {
+  $('#hbody').innerHTML = state.houses.map(h => {
+    const s = stats(tasksOf(h));
+    return `<tr class="click" data-house="${h.id}"><td><b>${esc(h.ort)}</b></td><td>${esc(h.name)}</td><td>${esc(h.kuerzel || '')}</td>
+      <td>${fmt(h.ue) || '<span class="muted">offen</span>'}</td><td>${fmt(h.x) || '<span class="muted">offen</span>'}</td>
+      <td>${esc(h.direktor || '')}</td><td><span class="badge">${esc(h.projektstatus || '–')}</span></td>
+      <td style="min-width:170px">${progressBar(s, 'thin')}<span class="small muted">${s.done}/${s.total} · ${s.over} überfällig</span></td>
+      <td style="white-space:nowrap"><button class="small" data-act="tasks" data-id="${h.id}">Aufgaben</button> <button class="small" data-act="xlsx" data-id="${h.id}" title="Checkliste als Excel herunterladen">Excel</button></td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="muted" style="padding:20px">Noch keine Häuser.</td></tr>';
 }
 
-function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
-
-$('#gAdd').onclick = () => {
-  const r = buildNewHouse(); if (!r) return;
-  state.houses = state.houses.filter(h => h.ort !== r.house.ort); state.tasks = state.tasks.filter(t => t.haus !== r.house.ort);
-  state.houses.push(r.house); state.tasks.push(...r.tasks); save(); render();
-};
-$('#gXlsx').onclick = () => {
-  const r = buildNewHouse(); if (!r) return;
-  const h = r.house;
-  const aoa = [[`IT-Checkliste Hotelübernahme: ${h.name}`], [], [],
-    [null, 'Hotel', h.name], [null, 'Ort', h.ort], [null, 'Übernahmetag', h.ue], [null, 'Go-Live neues Hotelsystem', h.x],
-    [null, 'Direktor/in', h.direktor], [null, 'PMS Champion', ''], [null, 'Oracle-Projektleitung', h.oracle], [null, 'Accor-Ansprechpartner', ''], [], [],
-    ['Nr.', 'Was ist zu tun?', 'Wen frage ich?', 'Bis wann?', 'Erledigt?', 'Antwort / Notiz', 'Hinweis', 'Bezug', 'Offset']];
-  let b = '';
-  for (const t of r.tasks) {
-    if (t.bereich !== b) { aoa.push([t.bereich]); b = t.bereich; }
-    aoa.push([t.nr, t.aufgabe, t.owner, t.frist || t.fristText, 'offen', '', t.hinweis, t.bezug === 'fix' ? '' : t.bezug, t.offset]);
+// ==================================================================
+// Seite: Vorlage
+// ==================================================================
+function renderVorlage() {
+  let b = null, html = '';
+  for (const v of [...state.vorlage].sort((a, b) => a.nr - b.nr)) {
+    if (v.bereich !== b) { b = v.bereich; html += `<tr class="group"><td colspan="8">${esc(b || 'ohne Bereich')}</td></tr>`; }
+    html += `<tr class="click ${v.aktiv === false ? 'inactive' : ''}" data-vorlage="${v.id}"><td>${v.nr}</td><td>${esc(v.aufgabe)}</td><td>${esc(v.owner)}</td>
+      <td>${esc(v.bezug)}</td><td>${v.offset === '' ? '' : (v.offset > 0 ? '+' : '') + v.offset}</td><td>${esc(v.fristText || '')}</td><td class="note">${esc(v.hinweis || '')}</td><td>${v.aktiv === false ? 'nein' : 'ja'}</td></tr>`;
   }
-  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true, dateNF: 'dd.mm.yyyy' });
-  ws['!cols'] = [{ wch: 5 }, { wch: 70 }, { wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 45 }, { wch: 6 }, { wch: 7 }];
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, h.ort.slice(0, 31));
-  XLSX.writeFile(wb, `IT-Checkliste_${h.ort.replace(/[^\wäöüÄÖÜß-]+/g, '_')}.xlsx`);
+  $('#vbody').innerHTML = html || '<tr><td colspan="8" class="muted" style="padding:20px">Keine Vorlage geladen.</td></tr>';
+}
+
+// ==================================================================
+// Formular-Dialog
+// ==================================================================
+let dlgState = null;
+function openForm({ title, fields, values, onSave, onDelete, extra, saveLabel }) {
+  dlgState = { fields, onSave, onDelete };
+  $('#dlgTitle').textContent = title;
+  $('#dlgMsg').textContent = '';
+  $('#dlgSave').textContent = saveLabel || 'Speichern';
+  $('#dlgDelete').classList.toggle('hidden', !onDelete);
+  $('#dlgFields').innerHTML = fields.map(f => {
+    const v = values[f.k];
+    const cls = `${f.span ? 'span2' : ''} ${f.type === 'checkbox' ? 'check' : ''}`;
+    const lbl = `<span class="${f.req ? 'req' : ''}">${esc(f.label)}</span>`;
+    const id = 'f_' + f.k;
+    let input;
+    switch (f.type) {
+      case 'textarea': input = `<textarea id="${id}" rows="${f.rows || 3}">${esc(v ?? '')}</textarea>`; break;
+      case 'select': input = `<select id="${id}">${f.options.map(o => { const [val, txt] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(val)}" ${String(val) === String(v ?? '') ? 'selected' : ''}>${esc(txt)}</option>`; }).join('')}</select>`; break;
+      case 'checkbox': return `<label class="${cls}"><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${esc(f.label)}</label>`;
+      case 'date': input = `<input type="date" id="${id}" value="${iso(v)}">`; break;
+      case 'number': input = `<input type="number" id="${id}" value="${v === '' || v == null ? '' : v}" step="1">`; break;
+      default: input = `<input type="text" id="${id}" value="${esc(v ?? '')}" ${f.list ? `list="${f.list}"` : ''} ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ''}>`;
+    }
+    return `<label class="${cls}">${lbl}${input}${f.help ? `<span class="muted small" style="font-weight:400">${f.help}</span>` : ''}</label>`;
+  }).join('');
+  $('#dlgExtra').innerHTML = extra || '';
+  $('#dlg').showModal();
+  const first = $('#dlgFields input, #dlgFields textarea, #dlgFields select'); if (first) first.focus();
+}
+function readForm() {
+  const out = {};
+  for (const f of dlgState.fields) {
+    const el = $('#f_' + f.k); if (!el) continue;
+    if (f.type === 'checkbox') out[f.k] = el.checked;
+    else if (f.type === 'date') out[f.k] = toDate(el.value);
+    else if (f.type === 'number') out[f.k] = numOrEmpty(el.value);
+    else out[f.k] = el.value.trim();
+  }
+  return out;
+}
+const closeDlg = () => { $('#dlg').close(); dlgState = null; };
+$('#dlgX').onclick = closeDlg;
+$('#dlgCancel').onclick = closeDlg;
+$('#dlgForm').onsubmit = async e => {
+  e.preventDefault();
+  if (!dlgState) return;
+  const vals = readForm();
+  const missing = dlgState.fields.filter(f => f.req && (vals[f.k] === '' || vals[f.k] == null));
+  if (missing.length) { $('#dlgMsg').textContent = 'Pflichtfeld fehlt: ' + missing.map(f => f.label).join(', '); return; }
+  await runBusy($('#dlgSave'), async () => { await dlgState.onSave(vals); closeDlg(); });
 };
-$('#gCsv').onclick = () => {
-  const r = buildNewHouse(); if (!r) return;
-  const q = v => { v = String(v ?? ''); return /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
-  const head = ['Ort', 'Nr', 'Bereich', 'Aufgabe', 'Owner', 'Bezug', 'OffsetTage', 'FristText', 'Frist', 'Status', 'Notiz', 'Hinweis'];
-  const lines = [head.join(';'), ...r.tasks.map(t => [t.haus, t.nr, t.bereich, t.aufgabe, t.owner, t.bezug, t.offset, t.fristText, iso(t.frist), 'offen', '', t.hinweis].map(q).join(';'))];
-  download(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `DHO_Aufgaben_${r.house.ort}.csv`);
+$('#dlgDelete').onclick = async () => {
+  if (!dlgState || !dlgState.onDelete) return;
+  if (!confirm('Wirklich löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  await runBusy($('#dlgDelete'), async () => { await dlgState.onDelete(); closeDlg(); });
+};
+async function runBusy(btn, fn) {
+  const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Bitte warten …';
+  try { await fn(); }
+  catch (e) { console.error(e); const m = e.message || String(e); if ($('#dlg').open) $('#dlgMsg').textContent = m; toast(m, true); }
+  finally { btn.disabled = false; btn.textContent = txt; }
+}
+
+// ---------- Aufgabe ----------
+function taskForm(t, isNew) {
+  const houseOpts = state.houses.map(h => [h.id, h.ort]);
+  openForm({
+    title: isNew ? 'Neue Aufgabe' : `Aufgabe ${t.nr} – ${t.haus}`,
+    values: t,
+    fields: [
+      { k: 'hausId', label: 'Haus', type: 'select', options: houseOpts, req: true },
+      { k: 'nr', label: 'Nr.', type: 'number' },
+      { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
+      { k: 'bereich', label: 'Bereich', list: 'dlBereich' },
+      { k: 'owner', label: 'Wen frage ich?', list: 'dlOwner' },
+      { k: 'status', label: 'Status', type: 'select', options: STATUS },
+      { k: 'erledigtAm', label: 'Erledigt am', type: 'date', help: 'wird beim Status „erledigt“ automatisch gesetzt' },
+      { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
+      { k: 'offset', label: 'Offset Tage', type: 'number', help: 'z. B. -14 = 14 Tage vor Ü bzw. X' },
+      { k: 'frist', label: 'Bis wann?', type: 'date', help: '<a href="#" id="calcFrist">aus Bezug + Offset berechnen</a>' },
+      { k: 'fristText', label: 'Frist-Text', placeholder: 'z. B. sofort, laufend' },
+      { k: 'notiz', label: 'Antwort / Notiz', type: 'textarea', span: true, rows: 4 },
+      { k: 'hinweis', label: 'Hinweis', type: 'textarea', span: true, rows: 2 }
+    ],
+    onSave: async v => {
+      const h = state.houses.find(x => String(x.id) === String(v.hausId));
+      const neu = Object.assign({}, t, v, { hausId: h.id, haus: h.ort });
+      await api.saveTask(neu, isNew);
+      toast(isNew ? 'Aufgabe angelegt' : 'Aufgabe gespeichert'); render();
+    },
+    onDelete: isNew ? null : async () => { await api.deleteTask(t); toast('Aufgabe gelöscht'); render(); }
+  });
+  const recalc = e => {
+    if (e) e.preventDefault();
+    const h = state.houses.find(x => String(x.id) === $('#f_hausId').value);
+    const f = h && calcFrist($('#f_bezug').value, numOrEmpty($('#f_offset').value), h.ue, h.x);
+    if (f) $('#f_frist').value = iso(f); else if (e) $('#dlgMsg').textContent = 'Keine Frist berechenbar (Ü/X des Hauses oder Offset fehlt).';
+  };
+  $('#calcFrist').onclick = recalc;
+  ['#f_bezug', '#f_offset', '#f_hausId'].forEach(s => $(s).addEventListener('change', () => recalc()));
+  $('#f_status').addEventListener('change', () => { if ($('#f_status').value === 'erledigt' && !$('#f_erledigtAm').value) $('#f_erledigtAm').value = iso(today); });
+}
+
+// ---------- Haus ----------
+function houseForm(h, isNew) {
+  const nTasks = isNew ? 0 : tasksOf(h).length;
+  const aktiveVorlage = state.vorlage.filter(v => v.aktiv !== false).length;
+  openForm({
+    title: isNew ? 'Neues Haus anlegen' : `Haus bearbeiten – ${h.ort}`,
+    saveLabel: isNew ? 'Haus + Checkliste anlegen' : 'Speichern',
+    values: Object.assign({ projektstatus: 'in Vorbereitung', mitCheckliste: true, neuBerechnen: true }, h),
+    fields: [
+      { k: 'name', label: 'Hotelname', span: true, req: true, placeholder: 'z. B. Mercure Hotel Musterstadt City' },
+      { k: 'ort', label: 'Ort', req: true },
+      { k: 'kuerzel', label: 'Hauskürzel', placeholder: 'z. B. DHO501' },
+      { k: 'ue', label: 'Übernahmetag (Ü)', type: 'date' },
+      { k: 'x', label: 'Go-Live Hotelsystem (X)', type: 'date' },
+      { k: 'direktor', label: 'Direktor/in' },
+      { k: 'pms', label: 'PMS Champion' },
+      { k: 'oracle', label: 'Oracle-Projektleitung' },
+      { k: 'projektstatus', label: 'Projektstatus', type: 'select', options: PROJEKTSTATUS },
+      { k: 'accor', label: 'Accor-Ansprechpartner', type: 'textarea', span: true, rows: 2 },
+      isNew ? { k: 'mitCheckliste', label: `Standort-Checkliste aus der Vorlage erzeugen (${aktiveVorlage} Punkte, Fristen aus Ü/X)`, type: 'checkbox', span: true }
+        : { k: 'neuBerechnen', label: 'Bei geändertem Ü/X: Fristen aller offenen Aufgaben neu berechnen', type: 'checkbox', span: true }
+    ],
+    extra: isNew ? '' : `<p class="muted small" style="margin:12px 0 0">${nTasks} Aufgaben in der Checkliste. ${nTasks === 0 && aktiveVorlage ? '<button type="button" class="small" id="btnGenCl">Checkliste jetzt aus Vorlage erzeugen</button>' : ''}</p>`,
+    onSave: async v => {
+      if (state.houses.some(o => o.ort.toLowerCase() === v.ort.toLowerCase() && o.id !== h.id)) throw new Error(`Ein Haus mit Ort „${v.ort}“ gibt es bereits.`);
+      if (isNew) {
+        const neu = Object.assign({}, v, { checkliste: false }); delete neu.mitCheckliste;
+        await api.saveHouse(neu, true);
+        if (v.mitCheckliste) { const n = await api.createChecklist(neu); toast(`Haus „${neu.ort}“ angelegt – ${n} Checklistenpunkte erzeugt`); }
+        else toast(`Haus „${neu.ort}“ angelegt`);
+      } else {
+        const datesChanged = iso(v.ue) !== iso(h.ue) || iso(v.x) !== iso(h.x);
+        const neu = Object.assign({}, h, v); delete neu.neuBerechnen;
+        await api.saveHouse(neu, false, h);
+        if (datesChanged && v.neuBerechnen) { const n = await api.recalcFristen(neu); toast(`Gespeichert – ${n} Fristen neu berechnet`); }
+        else toast('Haus gespeichert');
+      }
+      sortHouses(); render();
+    },
+    onDelete: isNew ? null : async () => {
+      if (!confirm(`Haus „${h.ort}“ UND alle ${nTasks} Aufgaben löschen?`)) throw new Error('Abgebrochen');
+      await api.deleteHouse(h); toast(`Haus „${h.ort}“ gelöscht`); render();
+    }
+  });
+  const b = $('#btnGenCl');
+  if (b) b.onclick = () => runBusy(b, async () => { const n = await api.createChecklist(h); closeDlg(); toast(`${n} Checklistenpunkte erzeugt`); render(); });
+}
+
+// ---------- Vorlage ----------
+function vorlageForm(v, isNew) {
+  openForm({
+    title: isNew ? 'Neuer Vorlagenpunkt' : `Vorlagenpunkt ${v.nr}`,
+    values: Object.assign({ aktiv: true, bezug: 'X' }, v),
+    fields: [
+      { k: 'nr', label: 'Nr.', type: 'number', req: true },
+      { k: 'bereich', label: 'Bereich', list: 'dlBereich', req: true },
+      { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
+      { k: 'owner', label: 'Wen frage ich?', list: 'dlOwner' },
+      { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
+      { k: 'offset', label: 'Offset Tage', type: 'number', help: 'negativ = vor dem Termin' },
+      { k: 'fristText', label: 'Frist-Text (bei „fix“)', placeholder: 'z. B. sofort, laufend' },
+      { k: 'hinweis', label: 'Hinweis', type: 'textarea', span: true, rows: 2 },
+      { k: 'aktiv', label: 'Aktiv (wird bei neuen Häusern übernommen)', type: 'checkbox', span: true }
+    ],
+    onSave: async val => { await api.saveVorlage(Object.assign({}, v, val), isNew); toast('Vorlage gespeichert'); render(); },
+    onDelete: isNew ? null : async () => { await api.deleteVorlage(v); toast('Vorlagenpunkt gelöscht'); render(); }
+  });
+}
+
+// ==================================================================
+// Daten-API: lokal oder SharePoint (Graph)
+// ==================================================================
+const upsert = (arr, obj) => { const i = arr.findIndex(x => x.id === obj.id); if (i >= 0) arr[i] = obj; else arr.push(obj); };
+const spDateOut = d => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).toISOString() : null;
+const spNum = v => v === '' || v == null ? null : +v;
+const houseFields = h => ({
+  Title: h.name, Ort: h.ort, Hauskuerzel: h.kuerzel || '', Uebernahmetag: spDateOut(h.ue), GoLive: spDateOut(h.x),
+  Direktor: h.direktor || '', PMSChampion: h.pms || '', OraclePL: h.oracle || '', AccorKontakt: h.accor || '',
+  Projektstatus: h.projektstatus || 'in Vorbereitung', ChecklisteErstellt: !!h.checkliste
+});
+const taskFields = t => ({
+  Title: t.aufgabe, Haus: t.haus, HausID: t.hausId, Nr: spNum(t.nr), Bereich: t.bereich || '', Owner: t.owner || '',
+  Bezug: t.bezug || 'fix', OffsetTage: spNum(t.offset), Frist: spDateOut(t.frist), FristText: t.fristText || '',
+  Status: t.status, ErledigtAm: spDateOut(t.erledigtAm), Notiz: t.notiz || '', Hinweis: t.hinweis || ''
+});
+const vorlageFields = v => ({
+  Title: v.aufgabe, Nr: spNum(v.nr), Bereich: v.bereich || '', Owner: v.owner || '', Bezug: v.bezug || 'fix',
+  OffsetTage: spNum(v.offset), FristText: v.fristText || '', Hinweis: v.hinweis || '', Aktiv: v.aktiv !== false
+});
+// null-Werte beim Anlegen weglassen (SharePoint mag kein null bei Create)
+const dropNull = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
+// Beim Ändern nur Felder schicken, die sich wirklich geändert haben
+const diffFields = (neu, alt) => Object.fromEntries(Object.entries(neu).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(alt[k])));
+async function spUpdateDiff(key, id, neu, alt) {
+  const d = diffFields(neu, alt);
+  if (Object.keys(d).length) await sp.update(key, id, d);
+}
+
+const api = {
+  async saveTask(t, isNew) {
+    if (t.status === 'erledigt' && !t.erledigtAm) t.erledigtAm = today;
+    if (t.status !== 'erledigt') t.erledigtAm = null;
+    if (state.live) {
+      if (isNew) { const r = await sp.create('aufgaben', dropNull(taskFields(t))); t.id = +r.id; }
+      else { const alt = state.tasks.find(x => x.id === t.id); await spUpdateDiff('aufgaben', t.id, taskFields(t), alt ? taskFields(alt) : {}); }
+    } else if (isNew) t.id = nextId(state.tasks);
+    upsert(state.tasks, t); save();
+  },
+  async deleteTask(t) {
+    if (state.live) await sp.remove('aufgaben', t.id);
+    state.tasks = state.tasks.filter(x => x.id !== t.id); save();
+  },
+  async saveHouse(h, isNew, alt) {
+    if (state.live) {
+      if (isNew) { const r = await sp.create('haeuser', dropNull(houseFields(h))); h.id = +r.id; }
+      else await spUpdateDiff('haeuser', h.id, houseFields(h), alt ? houseFields(alt) : {});
+    } else if (isNew) h.id = nextId(state.houses);
+    upsert(state.houses, h);
+    // Ort geändert -> Hausname in allen Aufgaben nachziehen
+    if (alt && alt.ort !== h.ort) {
+      const ts = tasksOf(h);
+      if (state.live) await sp.batch(ts.map(t => ({ method: 'PATCH', url: sp.itemUrl('aufgaben', t.id) + '/fields', body: { Haus: h.ort } })));
+      ts.forEach(t => t.haus = h.ort);
+    }
+    save();
+  },
+  async createChecklist(h) {
+    const vorlage = state.vorlage.filter(v => v.aktiv !== false).sort((a, b) => a.nr - b.nr);
+    if (!vorlage.length) throw new Error('Die Vorlage ist leer – erst unter „Vorlage“ Punkte anlegen.');
+    const neu = vorlage.map(v => ({
+      hausId: h.id, haus: h.ort, nr: v.nr, bereich: v.bereich, aufgabe: v.aufgabe, owner: v.owner, bezug: v.bezug, offset: v.offset,
+      frist: calcFrist(v.bezug, v.offset, h.ue, h.x), fristText: v.bezug === 'fix' ? (v.fristText || '') : '', status: 'offen', erledigtAm: null, notiz: '', hinweis: v.hinweis || ''
+    }));
+    if (state.live) {
+      const res = await sp.batch(neu.map(t => ({ method: 'POST', url: sp.listUrl('aufgaben') + '/items', body: { fields: dropNull(taskFields(t)) } })), 'Checkliste');
+      res.forEach((r, i) => { neu[i].id = +r.body.id; });
+      await sp.update('haeuser', h.id, { ChecklisteErstellt: true });
+    } else { let id = nextId(state.tasks); neu.forEach(t => t.id = id++); }
+    h.checkliste = true;
+    state.tasks.push(...neu); save();
+    return neu.length;
+  },
+  async recalcFristen(h) {
+    const changed = [];
+    for (const t of tasksOf(h)) {
+      if (!OPEN.includes(t.status) || t.bezug === 'fix') continue;
+      const f = calcFrist(t.bezug, t.offset, h.ue, h.x);
+      if (iso(f) !== iso(t.frist)) changed.push([t, f]);
+    }
+    if (state.live && changed.length) await sp.batch(changed.map(([t, f]) => ({ method: 'PATCH', url: sp.itemUrl('aufgaben', t.id) + '/fields', body: { Frist: spDateOut(f) } })), 'Fristen');
+    changed.forEach(([t, f]) => t.frist = f);
+    save();
+    return changed.length;
+  },
+  async deleteHouse(h) {
+    const ts = tasksOf(h);
+    if (state.live) {
+      if (ts.length) await sp.batch(ts.map(t => ({ method: 'DELETE', url: sp.itemUrl('aufgaben', t.id) })), 'Löschen');
+      await sp.remove('haeuser', h.id);
+    }
+    state.tasks = state.tasks.filter(t => t.hausId !== h.id);
+    state.houses = state.houses.filter(x => x.id !== h.id); save();
+  },
+  async saveVorlage(v, isNew) {
+    if (state.live) {
+      if (isNew) { const r = await sp.create('vorlage', dropNull(vorlageFields(v))); v.id = +r.id; }
+      else { const alt = state.vorlage.find(x => x.id === v.id); await spUpdateDiff('vorlage', v.id, vorlageFields(v), alt ? vorlageFields(alt) : {}); }
+    } else if (isNew) v.id = nextId(state.vorlage);
+    upsert(state.vorlage, v); save();
+  },
+  async deleteVorlage(v) {
+    if (state.live) await sp.remove('vorlage', v.id);
+    state.vorlage = state.vorlage.filter(x => x.id !== v.id); save();
+  }
 };
 
-// ------------------------------------------------------------------
-// Live-Modus: SharePoint-Listen über Microsoft Graph (MSAL, delegiert)
-// Konfiguration kommt aus URL-Parametern (?tenant=&client=&site=) oder
-// wird einmalig eingegeben und nur in diesem Browser gespeichert.
-// ------------------------------------------------------------------
+// ==================================================================
+// SharePoint über Microsoft Graph (MSAL, delegiert)
+// Konfiguration aus URL (?tenant=&client=&site=) oder Eingabe, gespeichert nur im Browser
+// ==================================================================
 const CFG_KEY = 'dho-sp-config-v1';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
-const SCOPES = ['https://graph.microsoft.com/Sites.Read.All'];
+const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
 const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO Checkliste Vorlage' };
 let msalApp = null, refreshTimer = null;
 
@@ -634,11 +982,8 @@ function loadCfg() {
   return c;
 }
 function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) { } }
-function cfgFromForm() {
-  return { tenant: $('#cTenant').value.trim(), client: $('#cClient').value.trim(), site: $('#cSite').value.trim().replace(/\/+$/, '') };
-}
-function fillCfgForm(c) { $('#cTenant').value = c.tenant || ''; $('#cClient').value = c.client || ''; $('#cSite').value = c.site || ''; }
 const cfgComplete = c => c.tenant && c.client && /^https:\/\/[^/]+\.sharepoint\.com\/sites\/[^/]+/i.test(c.site || '');
+function fillCfgForm(c) { $('#cTenant').value = c.tenant || ''; $('#cClient').value = c.client || ''; $('#cSite').value = c.site || ''; }
 
 async function getMsal(c) {
   if (typeof msal === 'undefined') throw new Error('MSAL-Bibliothek nicht geladen (lib/msal-browser.min.js).');
@@ -655,118 +1000,227 @@ async function getMsal(c) {
 }
 async function getToken(c, interactive) {
   const app = await getMsal(c);
-  // Anmeldung per Weiterleitung statt Popup (Popup-Blocker verhindern sonst den Login)
-  let account = app.getActiveAccount ? app.getActiveAccount() : null;
-  if (!account) account = app.getAllAccounts()[0];
+  let account = (app.getActiveAccount && app.getActiveAccount()) || app.getAllAccounts()[0];
   if (!account) {
     if (!interactive) return null;
     $('#cMsg').textContent = 'Weiterleitung zur Microsoft-Anmeldung …';
     await app.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
-    return null; // Seite wird verlassen, nach Rückkehr lädt der Start-Code automatisch
+    return null;
   }
   if (app.setActiveAccount) app.setActiveAccount(account);
   try { return (await app.acquireTokenSilent({ scopes: SCOPES, account })).accessToken; }
   catch (e) {
     if (!interactive) return null;
-    $('#cMsg').textContent = 'Weiterleitung zur Microsoft-Anmeldung …';
     await app.acquireTokenRedirect({ scopes: SCOPES, account });
     return null;
   }
 }
-async function graph(url, token) {
-  const r = await fetch(url.startsWith('http') ? url : GRAPH + url, { headers: { Authorization: 'Bearer ' + token } });
-  if (!r.ok) {
-    let msg = r.status + ' ' + r.statusText;
-    try { const j = await r.json(); msg = j.error?.message || msg; } catch (e) { }
-    throw new Error(`Graph ${r.status}: ${msg}`);
+
+const sp = {
+  cfg: null, siteId: null, lists: {},
+  async token() {
+    const t = await getToken(this.cfg, true);
+    if (!t) throw new Error('Anmeldung läuft – bitte nach der Rückkehr erneut versuchen.');
+    return t;
+  },
+  async req(method, path, body) {
+    const r = await fetch(path.startsWith('http') ? path : GRAPH + path, {
+      method, headers: { Authorization: 'Bearer ' + await this.token(), 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (!r.ok) throw new Error(graphError(r.status, await r.text()));
+    return r.status === 204 ? null : r.json();
+  },
+  listUrl(key) { return `/sites/${this.siteId}/lists/${this.lists[key]}`; },
+  itemUrl(key, id) { return `${this.listUrl(key)}/items/${id}`; },
+  create(key, fields) { return this.req('POST', this.listUrl(key) + '/items', { fields }); },
+  update(key, id, fields) { return this.req('PATCH', this.itemUrl(key, id) + '/fields', fields); },
+  remove(key, id) { return this.req('DELETE', this.itemUrl(key, id)); },
+  // JSON-Batch: max. 20 Anfragen pro Aufruf, Wiederholung bei 429/503
+  async batch(reqs, label) {
+    const results = new Array(reqs.length);
+    let pending = reqs.map((r, i) => i);
+    for (let runde = 0; pending.length && runde < 5; runde++) {
+      const retry = [];
+      for (let s = 0; s < pending.length; s += 20) {
+        const chunk = pending.slice(s, s + 20);
+        if (label) toast(`${label}: ${Math.min(s + 20, pending.length)} / ${pending.length} …`);
+        const body = {
+          requests: chunk.map(i => {
+            const r = reqs[i], o = { id: String(i), method: r.method, url: r.url };
+            if (r.body) { o.body = r.body; o.headers = { 'Content-Type': 'application/json' }; }
+            return o;
+          })
+        };
+        const res = await this.req('POST', '/$batch', body);
+        for (const x of res.responses) {
+          const i = +x.id;
+          if (x.status === 429 || x.status === 503) retry.push(i);
+          else if (x.status >= 400) throw new Error(graphError(x.status, JSON.stringify(x.body || {})));
+          else results[i] = x;
+        }
+      }
+      pending = retry;
+      if (pending.length) await new Promise(r => setTimeout(r, 3000 * (runde + 1)));
+    }
+    if (pending.length) throw new Error(`${pending.length} Änderungen wurden von SharePoint gedrosselt – bitte „Aktualisieren“ und erneut versuchen.`);
+    return results;
   }
-  return r.json();
+};
+function graphError(status, text) {
+  let msg = text;
+  try { msg = JSON.parse(text).error?.message || text; } catch (e) { }
+  if (status === 403) msg += ' – Schreibrechte fehlen (App-Berechtigung Sites.ReadWrite.All oder Bearbeitungsrecht auf der Site).';
+  if (status === 404) msg += ' – Site oder Liste nicht gefunden.';
+  return `SharePoint ${status}: ${msg}`;
 }
-async function graphAll(url, token) {
-  const out = [];
-  while (url) { const j = await graph(url, token); out.push(...(j.value || [])); url = j['@odata.nextLink']; }
-  return out;
-}
-const spDate = v => v ? toDate(new Date(v)) : null;   // UTC-Zeitstempel -> lokales Datum
-const num = v => (v === null || v === undefined || v === '') ? '' : +v;
+const spDate = v => v ? toDate(new Date(v)) : null;
 
 async function loadLive(interactive) {
   const c = loadCfg();
-  if (!cfgComplete(c)) { $('#liveStart').classList.remove('hidden'); $('#cMsg').textContent = 'Bitte Tenant-ID, Client-ID und Site-URL eintragen.'; return false; }
+  if (!cfgComplete(c)) { $('#cMsg').textContent = 'Bitte Tenant-ID, Client-ID und Site-URL eintragen.'; return false; }
+  sp.cfg = c;
   const btn = $('#btnRefresh'); btn.disabled = true; $('#cMsg').textContent = 'Verbinde …';
   try {
     const token = await getToken(c, interactive);
     if (!token) { if (!interactive) $('#cMsg').textContent = 'Bitte „Anmelden und laden“ klicken.'; return false; }
     const u = new URL(c.site);
-    const site = await graph(`/sites/${u.hostname}:${u.pathname}`, token);
-    const items = name => graphAll(`/sites/${site.id}/lists/${encodeURIComponent(name)}/items?expand=fields&$top=999`, token);
-    const [hs, ts, vs] = await Promise.all([items(LISTS.haeuser), items(LISTS.aufgaben), items(LISTS.vorlage).catch(() => [])]);
-    const listUrl = n => `${c.site}/Lists/${n}`;
-
-    const houses = hs.map(i => i.fields).map(f => ({
-      spId: +f.id, ort: f.Ort || f.Title, name: f.Title || f.Ort, ue: spDate(f.Uebernahmetag), x: spDate(f.GoLive),
-      direktor: f.Direktor || '', oracle: f.OraclePL || '', projektstatus: f.Projektstatus || '', quelle: 'SharePoint'
+    const site = await sp.req('GET', `/sites/${u.hostname}:${u.pathname}`);
+    sp.siteId = site.id;
+    const lists = await sp.req('GET', `/sites/${site.id}/lists?$select=id,displayName&$top=200`);
+    for (const [k, name] of Object.entries(LISTS)) {
+      const l = lists.value.find(x => x.displayName === name);
+      if (!l && k !== 'vorlage') throw new Error(`Liste „${name}“ nicht gefunden – erst das Setup-Skript ausführen.`);
+      sp.lists[k] = l ? l.id : null;
+    }
+    const all = async key => {
+      if (!sp.lists[key]) return [];
+      const out = []; let url = `${sp.listUrl(key)}/items?expand=fields&$top=999`;
+      while (url) { const j = await sp.req('GET', url); out.push(...j.value); url = j['@odata.nextLink']; }
+      return out.map(i => i.fields);
+    };
+    const [hs, ts, vs] = await Promise.all([all('haeuser'), all('aufgaben'), all('vorlage')]);
+    const houses = hs.map(f => ({
+      id: +f.id, ort: f.Ort || f.Title, name: f.Title || f.Ort, kuerzel: f.Hauskuerzel || '', ue: spDate(f.Uebernahmetag), x: spDate(f.GoLive),
+      direktor: f.Direktor || '', pms: f.PMSChampion || '', oracle: f.OraclePL || '', accor: f.AccorKontakt || '',
+      projektstatus: f.Projektstatus || 'in Vorbereitung', checkliste: !!f.ChecklisteErstellt
     }));
-    const tasks = ts.map(i => i.fields).map(f => ({
-      haus: f.Haus || (houses.find(h => h.spId === +f.HausID) || {}).ort || '?',
-      nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '',
-      bezug: f.Bezug || 'fix', offset: num(f.OffsetTage), frist: spDate(f.Frist), fristText: f.FristText || '',
-      status: normStatus(f.Status), notiz: f.Notiz || '', hinweis: f.Hinweis || '',
-      erledigtAm: spDate(f.ErledigtAm), spUrl: `${listUrl('DHOAufgaben')}/EditForm.aspx?ID=${f.id}`
+    const tasks = ts.map(f => {
+      const h = houses.find(x => x.id === +f.HausID) || houses.find(x => x.ort === f.Haus);
+      return {
+        id: +f.id, hausId: h ? h.id : null, haus: h ? h.ort : (f.Haus || '?'), nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '',
+        bezug: f.Bezug || 'fix', offset: numOrEmpty(f.OffsetTage), frist: spDate(f.Frist), fristText: f.FristText || '',
+        status: normStatus(f.Status), erledigtAm: spDate(f.ErledigtAm), notiz: f.Notiz || '', hinweis: f.Hinweis || ''
+      };
+    });
+    const vorlage = vs.map(f => ({
+      id: +f.id, nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '', bezug: f.Bezug || 'fix',
+      offset: numOrEmpty(f.OffsetTage), fristText: f.FristText || '', hinweis: f.Hinweis || '', aktiv: f.Aktiv !== false
     }));
-    const vorlage = vs.map(i => i.fields).filter(f => f.Aktiv !== false).map(f => ({
-      nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '',
-      bezug: f.Bezug || 'fix', offset: num(f.OffsetTage), fristRaw: f.FristText || null, hinweis: f.Hinweis || '', status: 'offen', notiz: ''
-    })).sort((a, b) => a.nr - b.nr);
-
-    // "Nächste Termine" aus Ü- und Go-Live-Daten ableiten
-    const termine = houses.flatMap(h => [
-      h.ue && { d: h.ue, haus: h.ort, was: 'Übernahme (Ü)' },
-      h.x && { d: h.x, haus: h.ort, was: 'Go-Live Hotelsystem (X)' }
-    ]).filter(t => t && t.d >= addDays(today, -7)).sort((a, b) => a.d - b.d)
-      .map(t => ({ datum: fmtShort(t.d) + (t.d < today ? ' ✓' : ''), haus: t.haus, was: t.was + (t.d >= today ? ` · in ${daysUntil(t.d)} Tagen` : '') }));
-
-    houses.sort((a, b) => (a.ue || a.x || new Date(9e15)) - (b.ue || b.x || new Date(9e15)));
-    state = { houses, tasks, vorlage, termine, loadedAt: new Date(), files: [], live: u.pathname.split('/').pop() };
+    state = Object.assign(emptyState(), { houses, tasks, vorlage, loadedAt: new Date(), live: u.pathname.split('/').pop() });
+    sortHouses();
     $('#cMsg').textContent = '';
-    render();
+    if (!$('#dlg').open) render();
     clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => loadLive(false), 5 * 60 * 1000);
+    refreshTimer = setInterval(() => { if (!$('#dlg').open) loadLive(false); }, 5 * 60 * 1000);
     return true;
   } catch (e) {
     console.error(e);
     let hint = '';
     if (/AADSTS50011|redirect/i.test(e.message)) hint = ` – Redirect-URI „${location.origin + location.pathname}“ in der App-Registrierung als SPA eintragen.`;
-    else if (/AADSTS65001|consent/i.test(e.message)) hint = ' – Berechtigung Sites.Read.All (Graph, delegiert) erteilen und Admin-Zustimmung geben.';
-    else if (/404/.test(e.message)) hint = ' – Site-URL oder Listennamen prüfen.';
+    else if (/AADSTS65001|consent/i.test(e.message)) hint = ' – Berechtigung Sites.ReadWrite.All (Graph, delegiert) erteilen und Administratorzustimmung geben.';
     $('#cMsg').textContent = '⚠ ' + e.message + hint;
-    $('#liveStart').classList.remove('hidden');
-    alert('SharePoint-Laden fehlgeschlagen:\n' + e.message + hint);
+    toast(e.message + hint, true);
     return false;
   } finally { btn.disabled = false; }
 }
 
-$('#cConnect').onclick = () => { const c = cfgFromForm(); if (!cfgComplete(c)) { $('#cMsg').textContent = '⚠ Bitte alle drei Felder korrekt ausfüllen.'; return; } saveCfg(c); msalApp = null; loadLive(true); };
-$('#btnLive').onclick = () => { const c = loadCfg(); if (cfgComplete(c)) loadLive(true); else { state = { houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [] }; render(); $('#cTenant').focus(); } };
-$('#btnRefresh').onclick = () => loadLive(true);
+// ==================================================================
+// Excel-Export einer Standort-Checkliste
+// ==================================================================
+function exportHouseXlsx(h) {
+  if (typeof XLSX === 'undefined') { toast('Excel-Bibliothek nicht geladen (Internetverbindung?)', true); return; }
+  const aoa = [[`IT-Checkliste Hotelübernahme: ${h.name}`], [], [],
+    [null, 'Hotel', h.name], [null, 'Ort', h.ort], [null, 'Übernahmetag', h.ue], [null, 'Go-Live neues Hotelsystem', h.x],
+    [null, 'Direktor/in', h.direktor], [null, 'PMS Champion', h.pms], [null, 'Oracle-Projektleitung', h.oracle], [null, 'Accor-Ansprechpartner', h.accor], [], [],
+    ['Nr.', 'Was ist zu tun?', 'Wen frage ich?', 'Bis wann?', 'Erledigt?', 'Antwort / Notiz', 'Hinweis', 'Bezug', 'Offset']];
+  let b = null;
+  for (const t of tasksOf(h).sort((a, c) => a.nr - c.nr)) {
+    if (t.bereich !== b) { aoa.push([t.bereich]); b = t.bereich; }
+    aoa.push([t.nr, t.aufgabe, t.owner, t.frist || t.fristText, t.status, t.notiz, t.hinweis, t.bezug === 'fix' ? '' : t.bezug, t.offset]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true, dateNF: 'dd.mm.yyyy' });
+  ws['!cols'] = [{ wch: 5 }, { wch: 70 }, { wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 45 }, { wch: 6 }, { wch: 7 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, h.ort.slice(0, 31));
+  XLSX.writeFile(wb, `IT-Checkliste_${h.ort.replace(/[^\wäöüÄÖÜß-]+/g, '_')}.xlsx`);
+}
 
-// ------------------------------------------------------------------
+// ==================================================================
 // Events
-// ------------------------------------------------------------------
+// ==================================================================
 $('#file').onchange = e => { loadFiles([...e.target.files]); e.target.value = ''; };
-const drop = document.body;
-drop.addEventListener('dragover', e => { e.preventDefault(); $('#drop').classList.add('over'); });
-drop.addEventListener('dragleave', () => $('#drop').classList.remove('over'));
-drop.addEventListener('drop', e => { e.preventDefault(); $('#drop').classList.remove('over'); loadFiles([...e.dataTransfer.files]); });
-$('#btnForget').onclick = () => { if (!confirm('Geladene Daten aus diesem Browser entfernen?')) return; try { localStorage.removeItem(STORE_KEY); } catch (e) { } state = { houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [] }; render(); };
-['#fHaus', '#fStatus', '#fOwner'].forEach(s => $(s).addEventListener('change', () => { if (s === '#fHaus') { selectedHouse = $('#fHaus').value; renderHouses(); } renderTable(); }));
+document.body.addEventListener('dragover', e => { e.preventDefault(); $('#drop').classList.add('over'); });
+document.body.addEventListener('dragleave', () => $('#drop').classList.remove('over'));
+document.body.addEventListener('drop', e => { e.preventDefault(); $('#drop').classList.remove('over'); loadFiles([...e.dataTransfer.files]); });
+$('#btnForget').onclick = () => {
+  if (!confirm('Lokal gespeicherte Daten aus diesem Browser entfernen?')) return;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { }
+  state = emptyState(); render();
+};
+$('#cConnect').onclick = () => {
+  const c = { tenant: $('#cTenant').value.trim(), client: $('#cClient').value.trim(), site: $('#cSite').value.trim().replace(/\/+$/, '') };
+  if (!cfgComplete(c)) { $('#cMsg').textContent = '⚠ Bitte alle drei Felder korrekt ausfüllen.'; return; }
+  saveCfg(c); msalApp = null; loadLive(true);
+};
+$('#btnLive').onclick = () => { const c = loadCfg(); if (cfgComplete(c)) loadLive(true); else { state = emptyState(); render(); $('#cTenant').focus(); } };
+$('#btnRefresh').onclick = async () => { if (await loadLive(true)) toast('Daten aktualisiert'); };
+
+['#fHaus', '#fStatus', '#fOwner'].forEach(s => $(s).addEventListener('change', renderTable));
 $('#fSearch').addEventListener('input', renderTable);
+
 $('#houses').addEventListener('click', e => {
   const c = e.target.closest('.house'); if (!c) return;
-  selectedHouse = selectedHouse === c.dataset.haus ? '' : c.dataset.haus;
-  $('#fHaus').value = selectedHouse; renderHouses(); renderTable();
-  document.querySelector('.tasks').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  location.hash = '#/aufgaben'; setTimeout(() => { $('#fHaus').value = c.dataset.haus; renderTable(); }, 0);
 });
+$('#tbody').addEventListener('change', async e => {
+  const sel = e.target.closest('select[data-status]'); if (!sel) return;
+  const t = state.tasks.find(x => x.id === +sel.dataset.status); if (!t) return;
+  sel.disabled = true;
+  try { await api.saveTask(Object.assign({}, t, { status: sel.value }), false); toast(`Status: ${sel.value}`); }
+  catch (err) { toast(err.message, true); }
+  renderTable();
+});
+$('#tbody').addEventListener('click', e => {
+  if (e.target.closest('select')) return;
+  const tr = e.target.closest('tr[data-task]'); if (!tr) return;
+  const t = state.tasks.find(x => x.id === +tr.dataset.task); if (t) taskForm(t, false);
+});
+$('#btnNewTask').onclick = () => {
+  if (!state.houses.length) { toast('Erst ein Haus anlegen.', true); return; }
+  const hId = +$('#fHaus').value || state.houses[0].id;
+  const nr = Math.max(0, ...state.tasks.filter(t => t.hausId === hId).map(t => +t.nr || 0)) + 1;
+  taskForm({ hausId: hId, nr, status: 'offen', bezug: 'X', offset: '', aufgabe: '', bereich: '', owner: '', notiz: '', hinweis: '', fristText: '', frist: null, erledigtAm: null }, true);
+};
+$('#hbody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]');
+  if (b) {
+    const h = state.houses.find(x => x.id === +b.dataset.id);
+    if (b.dataset.act === 'xlsx') exportHouseXlsx(h);
+    else { location.hash = '#/aufgaben'; setTimeout(() => { $('#fHaus').value = String(h.id); $('#fStatus').value = 'alle'; renderTable(); }, 0); }
+    return;
+  }
+  const tr = e.target.closest('tr[data-house]'); if (!tr) return;
+  houseForm(state.houses.find(x => x.id === +tr.dataset.house), false);
+});
+$('#btnNewHouse').onclick = () => houseForm({ id: null }, true);
+$('#vbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-vorlage]'); if (!tr) return;
+  vorlageForm(state.vorlage.find(x => x.id === +tr.dataset.vorlage), false);
+});
+$('#btnNewVorlage').onclick = () => {
+  const nr = Math.max(0, ...state.vorlage.map(v => +v.nr || 0)) + 1;
+  vorlageForm({ nr, aufgabe: '', bereich: '', owner: '', bezug: 'X', offset: '', fristText: '', hinweis: '', aktiv: true }, true);
+};
 
 // Tooltip
 const tip = $('#tip');
@@ -778,7 +1232,9 @@ document.addEventListener('mousemove', e => {
   tip.style.top = (e.clientY + 14) + 'px';
 });
 
-// Start: Live-Modus, wenn konfiguriert und bereits angemeldet – sonst lokale Daten
+// ==================================================================
+// Start: Live-Modus, wenn konfiguriert und angemeldet – sonst lokale Daten
+// ==================================================================
 (async () => {
   const c = loadCfg(); fillCfgForm(c);
   if (cfgComplete(c)) { saveCfg(c); if (await loadLive(false)) return; }

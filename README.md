@@ -95,7 +95,7 @@ Punkte mit Bezug `fix` haben einen Text („sofort“, „laufend“).
 ## 4. Dashboard live aus SharePoint
 
 `index.html` liest die Listen `DHO Häuser`, `DHO Aufgaben` und `DHO Checkliste Vorlage`
-direkt über Microsoft Graph, mit der Anmeldung des Benutzers (delegiert, nur lesen).
+direkt über Microsoft Graph, mit der Anmeldung des Benutzers (delegiert, lesen und schreiben).
 Es werden keine Daten im Repo oder auf einem Server gespeichert. Aktualisierung alle 5 Minuten
 und per Knopf; jede Aufgabe verlinkt auf ihr SharePoint-Bearbeitungsformular.
 
@@ -105,8 +105,22 @@ Einmalige Einrichtung (Entra ID → App-Registrierungen → Neue Registrierung, 
 2. Plattform **Single-Page-Anwendung (SPA)**, Umleitungs-URIs:
    - `https://<github-user>.github.io/<repo>/`
    - `https://<github-user>.github.io/<repo>/index.html`
-3. API-Berechtigungen → Microsoft Graph → Delegiert → `Sites.Read.All` → Administratorzustimmung erteilen
+3. API-Berechtigungen → Microsoft Graph → Delegiert → `Sites.ReadWrite.All` → Administratorzustimmung erteilen
+   (Jeder Benutzer kann trotzdem nur bearbeiten, was er in SharePoint selbst bearbeiten darf.)
 4. Dashboard aufrufen und Tenant-ID, Client-ID und Site-URL eintragen – oder als Lesezeichen:
    `https://<github-user>.github.io/<repo>/?tenant=<tenant-id>&client=<client-id>&site=https://<tenant>.sharepoint.com/sites/<site>`
+
+### Seiten
+
+| Seite | Inhalt |
+|---|---|
+| **Übersicht** | Kennzahlen, Fortschritt je Haus, Zeitplan Ü/X, Heatmap je Bereich, nächste Termine |
+| **Aufgaben** | Filter, Status direkt in der Tabelle ändern, Zeile anklicken = alle Felder bearbeiten, neue Aufgabe, löschen |
+| **Häuser** | Neues Haus mit allen Angaben → Standort-Checkliste wird automatisch aus der Vorlage erzeugt; Ü/X ändern → offene Fristen neu berechnen; Excel-Export je Haus |
+| **Vorlage** | Checklisten-Vorlage pflegen (gilt für neue Häuser) |
+
+Status „erledigt“ setzt automatisch „Erledigt am“. Beim Bearbeiten werden nur geänderte Felder an SharePoint geschickt,
+Massenänderungen (Checkliste anlegen, Fristen neu berechnen, Haus löschen) laufen gebündelt über Graph `$batch`.
+Im Datei-Modus (Excel/CSV) funktioniert alles ebenfalls, Änderungen bleiben dann aber nur im Browser.
 
 Die Bibliothek `lib/msal-browser.min.js` (MSAL 2.39.0, MIT-Lizenz) liegt im Repo, damit die Seite ohne fremdes CDN anmeldet.
