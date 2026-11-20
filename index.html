@@ -201,6 +201,21 @@
 
   /* Formulare */
   .form { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-step); }
+  .pp { position: relative; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-height: 38px; padding: 4px; border: 1px solid var(--border); background: var(--surface-1); cursor: text; }
+  .pp:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .pp .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: var(--on-accent); padding: 3px 4px 3px 10px; font-size: 12px; font-weight: 700; }
+  .pp .chip.frei { background: var(--cd-graubeige); color: var(--cd-nachtblau); }
+  .pp .chip button { background: transparent; border: 0; color: inherit; padding: 0 4px; font-size: 14px; line-height: 1; cursor: pointer; font-weight: 700; }
+  .pp input { flex: 1; min-width: 160px; border: 0 !important; outline: none !important; padding: 4px 6px; background: transparent; }
+  .pp-menu { position: absolute; left: -1px; right: -1px; top: calc(100% + 2px); background: var(--surface-1); border: 1px solid var(--border); border-top: var(--accent-line) solid var(--accent); max-height: 240px; overflow: auto; z-index: 20; box-shadow: 0 12px 28px var(--shadow); }
+  .pp-menu .opt { padding: var(--sp-inline) 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; gap: var(--sp-inline); }
+  .pp-menu .opt:hover, .pp-menu .opt.act { background: var(--surface-0); }
+  .pp-menu .opt small { color: var(--text-muted); }
+  .pp-menu .grp { padding: 6px 12px 2px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .pp-menu .neu { color: var(--accent); font-weight: 700; }
+  .pp-hint { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+  .form .lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); font-weight: 700; }
+  .form .lbl.span2 { grid-column: span 2; }
   .form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); font-weight: 700; }
   .form label.span2 { grid-column: span 2; }
   .form label.check { flex-direction: row; align-items: center; gap: var(--sp-inline); font-size: 13px; color: var(--text-primary); }
@@ -243,6 +258,7 @@
     <a href="#/aufgaben" data-route="aufgaben">Aufgaben</a>
     <a href="#/haeuser" data-route="haeuser">Häuser</a>
     <a href="#/vorlage" data-route="vorlage">Vorlage</a>
+    <a href="#/personen" data-route="personen">Personen</a>
   </nav>
 </header>
 
@@ -349,6 +365,34 @@
     </section>
   </div>
 
+  <!-- ================= Personen ================= -->
+  <div id="page-personen" class="page hidden">
+    <div id="personenHinweis" class="banner hidden"></div>
+    <section class="card">
+      <div class="card-head">
+        <h2>Personen (Zuständige / Ansprechpartner)</h2>
+        <button class="primary" id="btnNewPerson">+ Neue Person</button>
+      </div>
+      <p class="muted small" style="margin-top:-4px">Diese Namen stehen im Feld „Zuständig / Ansprechpartner“ zur Auswahl. Man kann dort aber auch jederzeit einen Namen frei eintippen.</p>
+      <div class="tablewrap">
+        <table class="data">
+          <thead><tr><th>Name</th><th>Rolle / Funktion</th><th>Firma</th><th>E-Mail</th><th>Offene Aufgaben</th><th>Aktiv</th></tr></thead>
+          <tbody id="pbody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Namen in den Aufgaben</h2>
+      <p class="muted small" style="margin-top:-8px">Alle Namen, die aktuell in Aufgaben und Vorlage eingetragen sind. „Ersetzen“ ändert den Namen in allen Aufgaben und in der Vorlage auf einmal – z. B. „ich“ → richtiger Name.</p>
+      <div class="tablewrap">
+        <table class="data">
+          <thead><tr><th>Name</th><th>Aufgaben</th><th>davon offen</th><th>Vorlage</th><th>In Personenliste</th><th></th></tr></thead>
+          <tbody id="nbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
   <!-- ================= Vorlage ================= -->
   <div id="page-vorlage" class="page hidden">
     <section class="card">
@@ -383,6 +427,7 @@
 </dialog>
 <datalist id="dlOwner"></datalist>
 <datalist id="dlBereich"></datalist>
+<datalist id="dlFirma"><option value="HON Service"><option value="Hotel"><option value="Accor"><option value="Oracle"><option value="Dienstleister"></datalist>
 <div id="tip"></div>
 <div id="toast"></div>
 
@@ -395,7 +440,7 @@ const STORE_KEY = 'dho-dashboard-v2';
 const OPEN = ['offen', 'prüfen', 'klären'];
 const STATUS = ['offen', 'prüfen', 'klären', 'erledigt', 'entfällt'];
 const PROJEKTSTATUS = ['in Vorbereitung', 'übernommen', 'live', 'abgeschlossen'];
-const emptyState = () => ({ houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [], live: null });
+const emptyState = () => ({ houses: [], tasks: [], vorlage: [], personen: [], termine: [], loadedAt: null, files: [], live: null });
 let state = emptyState();
 
 const $ = s => document.querySelector(s);
@@ -554,6 +599,7 @@ function restore() {
   try {
     const raw = localStorage.getItem(STORE_KEY); if (!raw) return false;
     state = Object.assign(emptyState(), revive(JSON.parse(raw)));
+    state.personen = state.personen || [];
     return state.houses.length > 0;
   } catch (e) { return false; }
 }
@@ -579,7 +625,7 @@ const progressBar = (s, cls = '') => {
 // ==================================================================
 // Navigation
 // ==================================================================
-const ROUTES = ['uebersicht', 'aufgaben', 'haeuser', 'vorlage'];
+const ROUTES = ['uebersicht', 'aufgaben', 'haeuser', 'vorlage', 'personen'];
 const route = () => { const r = (location.hash.match(/^#\/(\w+)/) || [])[1]; return ROUTES.includes(r) ? r : 'uebersicht'; };
 window.addEventListener('hashchange', () => render());
 
@@ -599,10 +645,10 @@ function render() {
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.route === r));
   $('#page-' + r).classList.remove('hidden');
   updateDatalists();
-  ({ uebersicht: renderUebersicht, aufgaben: renderAufgaben, haeuser: renderHaeuser, vorlage: renderVorlage })[r]();
+  ({ uebersicht: renderUebersicht, aufgaben: renderAufgaben, haeuser: renderHaeuser, vorlage: renderVorlage, personen: renderPersonen })[r]();
 }
 function updateDatalists() {
-  const owners = [...new Set(state.tasks.concat(state.vorlage).map(t => t.owner).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const owners = allNames();
   const bereiche = [...new Set(state.vorlage.concat(state.tasks).map(t => t.bereich).filter(Boolean))];
   $('#dlOwner').innerHTML = owners.map(o => `<option value="${esc(o)}">`).join('');
   $('#dlBereich').innerHTML = bereiche.map(o => `<option value="${esc(o)}">`).join('');
@@ -691,7 +737,8 @@ function renderHeat() {
 // ==================================================================
 // Seite: Aufgaben
 // ==================================================================
-const splitOwners = o => String(o || '').split(/\s*[\/,]\s*|\s*→\s*/).map(s => s.trim()).filter(Boolean);
+// Trennung nur bei „ / “ (mit Leerzeichen), Komma, Semikolon oder Pfeil – „Direktor/in“ bleibt ein Name
+const splitOwners = o => String(o || '').split(/\s+\/\s+|\s*[,;]\s*|\s*→\s*/).map(s => s.trim()).filter(Boolean);
 function renderAufgaben() {
   const keepH = $('#fHaus').value, keepO = $('#fOwner').value;
   $('#fHaus').innerHTML = '<option value="">Alle Häuser</option>' + state.houses.map(h => `<option value="${h.id}" ${String(h.id) === keepH ? 'selected' : ''}>${esc(h.ort)}</option>`).join('');
@@ -779,10 +826,13 @@ function openForm({ title, fields, values, onSave, onDelete, extra, saveLabel, r
       case 'checkbox': return `<label class="${cls}"><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${esc(f.label)}</label>`;
       case 'date': input = `<input type="date" id="${id}" value="${iso(v)}">`; break;
       case 'number': input = `<input type="number" id="${id}" value="${v === '' || v == null ? '' : v}" step="1">`; break;
+      case 'people': return `<div class="lbl ${cls}">${lbl}<div class="pp" id="${id}"></div><span class="pp-hint">Namen auswählen oder eintippen + Enter · mehrere Personen möglich</span></div>`;
       default: input = `<input type="text" id="${id}" value="${esc(v ?? '')}" ${f.list ? `list="${f.list}"` : ''} ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ''}>`;
     }
     return `<label class="${cls}">${lbl}${input}${f.help ? `<span class="muted small" style="font-weight:400">${f.help}</span>` : ''}</label>`;
   }).join('');
+  dlgState.pickers = {};
+  for (const f of fields.filter(f => f.type === 'people')) dlgState.pickers[f.k] = mountPeoplePicker($('#f_' + f.k), values[f.k]);
   $('#dlgExtra').innerHTML = extra || '';
   $('#dlg').showModal();
   const first = $('#dlgFields input, #dlgFields textarea, #dlgFields select'); if (first) first.focus();
@@ -791,7 +841,8 @@ function readForm() {
   const out = {};
   for (const f of dlgState.fields) {
     const el = $('#f_' + f.k); if (!el) continue;
-    if (f.type === 'checkbox') out[f.k] = el.checked;
+    if (f.type === 'people') out[f.k] = dlgState.pickers[f.k].value();
+    else if (f.type === 'checkbox') out[f.k] = el.checked;
     else if (f.type === 'date') out[f.k] = toDate(el.value);
     else if (f.type === 'number') out[f.k] = numOrEmpty(el.value);
     else out[f.k] = el.value.trim();
@@ -821,6 +872,149 @@ async function runBusy(btn, fn) {
   finally { btn.disabled = false; btn.textContent = txt; }
 }
 
+
+// ==================================================================
+// Personen: Auswahlfeld (Liste + frei eintippen, mehrere Namen)
+// ==================================================================
+const joinOwners = arr => arr.join(' / ');
+const personNames = () => state.personen.filter(p => p.aktiv !== false).map(p => p.name).sort((a, b) => a.localeCompare(b, 'de'));
+function usedNames() {
+  const m = new Map();
+  for (const t of state.tasks.concat(state.vorlage)) for (const n of splitOwners(t.owner)) m.set(n, (m.get(n) || 0) + 1);
+  return m;
+}
+const allNames = () => [...new Set(personNames().concat([...usedNames().keys()]))].sort((a, b) => a.localeCompare(b, 'de'));
+
+function mountPeoplePicker(el, initial) {
+  let chips = splitOwners(initial);
+  let act = -1, opts = [];
+  el.innerHTML = '';
+  const input = document.createElement('input');
+  input.type = 'text'; input.placeholder = 'Name auswählen oder eintippen …'; input.autocomplete = 'off';
+  const menu = document.createElement('div'); menu.className = 'pp-menu hidden';
+  const personSet = () => new Set(personNames());
+  const add = name => {
+    name = String(name || '').trim().replace(/\s+/g, ' ');
+    if (name && !chips.some(c => c.toLowerCase() === name.toLowerCase())) chips.push(name);
+    input.value = ''; draw(); input.focus(); menu.classList.add('hidden');
+  };
+  const draw = () => {
+    el.querySelectorAll('.chip').forEach(c => c.remove());
+    const ps = personSet();
+    for (const c of chips) {
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (ps.has(c) ? '' : ' frei');
+      chip.title = ps.has(c) ? 'aus Personenliste' : 'frei eingetragen';
+      chip.innerHTML = `${esc(c)}<button type="button" aria-label="${esc(c)} entfernen">×</button>`;
+      chip.querySelector('button').onclick = e => { e.stopPropagation(); chips = chips.filter(x => x !== c); draw(); input.focus(); };
+      el.insertBefore(chip, input);
+    }
+  };
+  const showMenu = () => {
+    const q = input.value.trim().toLowerCase();
+    const ps = personNames(), used = [...usedNames().keys()];
+    const frei = used.filter(n => !ps.includes(n));
+    const match = n => !chips.includes(n) && (!q || n.toLowerCase().includes(q));
+    const p = state.personen.filter(x => x.aktiv !== false && match(x.name)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    const f = frei.filter(match).sort((a, b) => a.localeCompare(b, 'de'));
+    opts = []; let html = '';
+    if (p.length) { html += '<div class="grp">Personenliste</div>'; for (const x of p) { html += `<div class="opt" data-i="${opts.length}"><span>${esc(x.name)}</span><small>${esc([x.rolle, x.firma].filter(Boolean).join(' · '))}</small></div>`; opts.push(x.name); } }
+    if (f.length) { html += '<div class="grp">Bisher verwendet</div>'; for (const n of f) { html += `<div class="opt" data-i="${opts.length}">${esc(n)}</div>`; opts.push(n); } }
+    const treffer = opts.length;
+    if (q && !allNames().some(n => n.toLowerCase() === q) && !chips.some(c => c.toLowerCase() === q)) {
+      html += `<div class="grp">Neu</div><div class="opt neu" data-i="${opts.length}">+ „${esc(input.value.trim())}“ übernehmen</div>`; opts.push(input.value.trim());
+    }
+    if (!opts.length) { menu.classList.add('hidden'); return; }
+    act = q ? 0 : -1;   // bei Eingabe: erster Treffer (oder „übernehmen“, wenn es keinen gibt)
+    menu.innerHTML = html; place(); menu.classList.remove('hidden'); mark();
+  };
+  const mark = () => menu.querySelectorAll('.opt').forEach(o => { o.classList.toggle('act', +o.dataset.i === act); if (+o.dataset.i === act) o.scrollIntoView({ block: 'nearest' }); });
+  const place = () => {
+    const r = el.getBoundingClientRect();
+    const unten = innerHeight - r.bottom, hoch = Math.min(260, Math.max(unten, r.top) - 12);
+    Object.assign(menu.style, { position: 'fixed', left: r.left + 'px', width: r.width + 'px', right: 'auto', maxHeight: hoch + 'px' });
+    if (unten >= 180 || unten >= r.top) { menu.style.top = (r.bottom + 2) + 'px'; menu.style.bottom = 'auto'; }
+    else { menu.style.top = 'auto'; menu.style.bottom = (innerHeight - r.top + 2) + 'px'; }
+  };
+  const body = el.closest('.dbody'); if (body) body.addEventListener('scroll', () => menu.classList.add('hidden'));
+  menu.addEventListener('mousedown', e => {
+    const o = e.target.closest('.opt'); if (!o) return;
+    e.preventDefault(); add(opts[+o.dataset.i]);
+  });
+  input.addEventListener('focus', showMenu);
+  input.addEventListener('input', showMenu);
+  input.addEventListener('blur', () => setTimeout(() => menu.classList.add('hidden'), 120));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+      e.preventDefault();
+      if (act >= 0 && opts[act] && !menu.classList.contains('hidden')) add(opts[act]); else if (input.value.trim()) add(input.value);
+    } else if (e.key === 'ArrowDown') { e.preventDefault(); act = Math.min(opts.length - 1, act + 1); mark(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); act = Math.max(0, act - 1); mark(); }
+    else if (e.key === 'Escape') { if (!menu.classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); menu.classList.add('hidden'); } }
+    else if (e.key === 'Backspace' && !input.value && chips.length) { chips.pop(); draw(); }
+  });
+  el.addEventListener('click', e => { if (e.target === el) input.focus(); });
+  el.appendChild(input); el.appendChild(menu);
+  draw();
+  return { value: () => { if (input.value.trim()) add(input.value); return joinOwners(chips); } };
+}
+
+// ---------- Seite: Personen ----------
+function renderPersonen() {
+  const live = !!state.live, fehlt = live && !sp.lists.personen;
+  $('#personenHinweis').classList.toggle('hidden', !fehlt);
+  $('#personenHinweis').innerHTML = fehlt ? '⚠ Die SharePoint-Liste „DHO Personen“ gibt es noch nicht. Einmal das Skript <b>DHO-Personen-Liste.ps1</b> ausführen, dann „Aktualisieren“. Bis dahin können Namen im Aufgabenformular frei eingetippt werden.' : '';
+  $('#btnNewPerson').disabled = fehlt;
+  const used = usedNames();
+  const offen = n => state.tasks.filter(t => OPEN.includes(t.status) && splitOwners(t.owner).includes(n)).length;
+  $('#pbody').innerHTML = [...state.personen].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(p =>
+    `<tr class="click ${p.aktiv === false ? 'inactive' : ''}" data-person="${p.id}"><td><b>${esc(p.name)}</b></td><td>${esc(p.rolle || '')}</td><td>${esc(p.firma || '')}</td>
+     <td>${p.email ? `<a href="mailto:${esc(p.email)}" onclick="event.stopPropagation()">${esc(p.email)}</a>` : ''}</td><td>${offen(p.name)}</td><td>${p.aktiv === false ? 'nein' : 'ja'}</td></tr>`
+  ).join('') || '<tr><td colspan="6" class="muted" style="padding:16px">Noch keine Personen – „+ Neue Person“ oder unten bei „Namen in den Aufgaben“ übernehmen.</td></tr>';
+
+  const inListe = new Set(state.personen.map(p => p.name.toLowerCase()));
+  const vorl = new Map(); for (const v of state.vorlage) for (const n of splitOwners(v.owner)) vorl.set(n, (vorl.get(n) || 0) + 1);
+  const names = [...used.keys()].sort((a, b) => a.localeCompare(b, 'de'));
+  $('#nbody').innerHTML = names.map(n => {
+    const nT = state.tasks.filter(t => splitOwners(t.owner).includes(n)).length;
+    const drin = inListe.has(n.toLowerCase());
+    return `<tr><td><b>${esc(n)}</b></td><td>${nT}</td><td>${offen(n)}</td><td>${vorl.get(n) || 0}</td><td>${drin ? 'ja' : '<span class="muted">nein</span>'}</td>
+      <td style="white-space:nowrap">${drin || fehlt ? '' : `<button class="small" data-np="${esc(n)}">Als Person anlegen</button> `}<button class="small" data-nr="${esc(n)}">Ersetzen …</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted" style="padding:16px">Keine Namen eingetragen.</td></tr>';
+}
+function personForm(p, isNew) {
+  openForm({
+    title: isNew ? 'Neue Person' : `Person – ${p.name}`,
+    values: Object.assign({ aktiv: true }, p),
+    fields: [
+      { k: 'name', label: 'Name', req: true, placeholder: 'Vor- und Nachname' },
+      { k: 'rolle', label: 'Rolle / Funktion', placeholder: 'z. B. IT-Leitung, Revenue, Projektleitung Oracle' },
+      { k: 'firma', label: 'Firma', list: 'dlFirma', placeholder: 'z. B. HON Service, Hotel, Accor, Oracle' },
+      { k: 'email', label: 'E-Mail' },
+      { k: 'aktiv', label: 'Aktiv (in der Auswahl anzeigen)', type: 'checkbox', span: true }
+    ],
+    onSave: async v => {
+      if (state.personen.some(o => o.name.toLowerCase() === v.name.toLowerCase() && o.id !== p.id)) throw new Error(`„${v.name}“ gibt es bereits.`);
+      const alt = p.name;
+      await api.savePerson(Object.assign({}, p, v), isNew);
+      if (!isNew && alt && alt !== v.name && usedNames().has(alt) && confirm(`Name auch in allen Aufgaben von „${alt}“ auf „${v.name}“ ändern?`)) {
+        const n = await api.replaceName(alt, v.name); toast(`Gespeichert – ${n} Einträge umbenannt`);
+      } else toast(isNew ? 'Person angelegt' : 'Person gespeichert');
+      render();
+    },
+    onDelete: isNew ? null : async () => { await api.deletePerson(p); toast('Person gelöscht'); render(); }
+  });
+}
+function replaceForm(alt) {
+  openForm({
+    title: `„${alt}“ ersetzen`,
+    saveLabel: 'In allen Aufgaben ersetzen',
+    values: {},
+    fields: [{ k: 'neu', label: `„${alt}“ ersetzen durch`, type: 'people', span: true, req: true }],
+    extra: `<p class="muted small" style="margin-top:16px">Betrifft ${state.tasks.filter(t => splitOwners(t.owner).includes(alt)).length} Aufgaben und ${state.vorlage.filter(t => splitOwners(t.owner).includes(alt)).length} Vorlagenpunkte. Andere Namen in denselben Einträgen bleiben erhalten.</p>`,
+    onSave: async v => { const n = await api.replaceName(alt, v.neu); toast(`${n} Einträge geändert`); render(); }
+  });
+}
 
 // ---------- Detailansicht: erledigt / nicht erledigt ----------
 function openDetail(title, tasks, opts = {}) {
@@ -875,7 +1069,7 @@ function taskForm(t, isNew) {
       { k: 'nr', label: 'Nr.', type: 'number' },
       { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
       { k: 'bereich', label: 'Bereich', list: 'dlBereich' },
-      { k: 'owner', label: 'Zuständig / Ansprechpartner', list: 'dlOwner' },
+      { k: 'owner', label: 'Zuständig / Ansprechpartner', type: 'people', span: true },
       { k: 'status', label: 'Status', type: 'select', options: STATUS },
       { k: 'erledigtAm', label: 'Erledigt am', type: 'date', help: 'wird beim Status „erledigt“ automatisch gesetzt' },
       { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
@@ -918,9 +1112,9 @@ function houseForm(h, isNew) {
       { k: 'kuerzel', label: 'Hauskürzel', placeholder: 'z. B. DHO501' },
       { k: 'ue', label: 'Übernahmetag (Ü)', type: 'date' },
       { k: 'x', label: 'Go-Live Hotelsystem (X)', type: 'date' },
-      { k: 'direktor', label: 'Direktor/in' },
-      { k: 'pms', label: 'PMS Champion' },
-      { k: 'oracle', label: 'Oracle-Projektleitung' },
+      { k: 'direktor', label: 'Direktor/in', list: 'dlOwner' },
+      { k: 'pms', label: 'PMS Champion', list: 'dlOwner' },
+      { k: 'oracle', label: 'Oracle-Projektleitung', list: 'dlOwner' },
       { k: 'projektstatus', label: 'Projektstatus', type: 'select', options: PROJEKTSTATUS },
       { k: 'accor', label: 'Accor-Ansprechpartner', type: 'textarea', span: true, rows: 2 },
       isNew ? { k: 'mitCheckliste', label: `Standort-Checkliste aus der Vorlage erzeugen (${aktiveVorlage} Punkte, Fristen aus Ü/X)`, type: 'checkbox', span: true }
@@ -961,7 +1155,7 @@ function vorlageForm(v, isNew) {
       { k: 'nr', label: 'Nr.', type: 'number', req: true },
       { k: 'bereich', label: 'Bereich', list: 'dlBereich', req: true },
       { k: 'aufgabe', label: 'Was ist zu tun?', type: 'textarea', span: true, req: true, rows: 2 },
-      { k: 'owner', label: 'Zuständig / Ansprechpartner', list: 'dlOwner' },
+      { k: 'owner', label: 'Zuständig / Ansprechpartner', type: 'people', span: true },
       { k: 'bezug', label: 'Bezug', type: 'select', options: [['Ü', 'Ü – Übernahmetag'], ['X', 'X – Go-Live'], ['fix', 'fix / ohne Bezug']] },
       { k: 'offset', label: 'Offset Tage', type: 'number', help: 'negativ = vor dem Termin' },
       { k: 'fristText', label: 'Frist-Text (bei „fix“)', placeholder: 'z. B. sofort, laufend' },
@@ -989,6 +1183,7 @@ const taskFields = t => ({
   Bezug: t.bezug || 'fix', OffsetTage: spNum(t.offset), Frist: spDateOut(t.frist), FristText: t.fristText || '',
   Status: t.status, ErledigtAm: spDateOut(t.erledigtAm), Notiz: t.notiz || '', Hinweis: t.hinweis || ''
 });
+const personFields = p => ({ Title: p.name, Rolle: p.rolle || '', Firma: p.firma || '', EMail: p.email || '', Aktiv: p.aktiv !== false });
 const vorlageFields = v => ({
   Title: v.aufgabe, Nr: spNum(v.nr), Bereich: v.bereich || '', Owner: v.owner || '', Bezug: v.bezug || 'fix',
   OffsetTage: spNum(v.offset), FristText: v.fristText || '', Hinweis: v.hinweis || '', Aktiv: v.aktiv !== false
@@ -1074,6 +1269,37 @@ const api = {
     } else if (isNew) v.id = nextId(state.vorlage);
     upsert(state.vorlage, v); save();
   },
+  async savePerson(p, isNew) {
+    if (state.live) {
+      if (!sp.lists.personen) throw new Error('Liste „DHO Personen“ fehlt – erst DHO-Personen-Liste.ps1 ausführen.');
+      if (isNew) { const r = await sp.create('personen', dropNull(personFields(p))); p.id = +r.id; }
+      else { const alt = state.personen.find(x => x.id === p.id); await spUpdateDiff('personen', p.id, personFields(p), alt ? personFields(alt) : {}); }
+    } else if (isNew) p.id = nextId(state.personen);
+    upsert(state.personen, p); save();
+  },
+  async deletePerson(p) {
+    if (state.live) await sp.remove('personen', p.id);
+    state.personen = state.personen.filter(x => x.id !== p.id); save();
+  },
+  // Namen in allen Aufgaben und in der Vorlage ersetzen (andere Namen im Eintrag bleiben)
+  async replaceName(alt, neuStr) {
+    const neu = splitOwners(neuStr);
+    const ersetze = owner => {
+      const teile = splitOwners(owner);
+      if (!teile.includes(alt)) return null;
+      return joinOwners([...new Set(teile.flatMap(x => x === alt ? neu : [x]))]);
+    };
+    const tChg = state.tasks.map(t => [t, ersetze(t.owner)]).filter(([, o]) => o !== null);
+    const vChg = state.vorlage.map(v => [v, ersetze(v.owner)]).filter(([, o]) => o !== null);
+    if (state.live) {
+      const reqs = tChg.map(([t, o]) => ({ method: 'PATCH', url: sp.itemUrl('aufgaben', t.id) + '/fields', body: { Owner: o } }))
+        .concat(vChg.map(([v, o]) => ({ method: 'PATCH', url: sp.itemUrl('vorlage', v.id) + '/fields', body: { Owner: o } })));
+      if (reqs.length) await sp.batch(reqs, 'Ersetzen');
+    }
+    tChg.forEach(([t, o]) => t.owner = o); vChg.forEach(([v, o]) => v.owner = o);
+    save();
+    return tChg.length + vChg.length;
+  },
   async deleteVorlage(v) {
     if (state.live) await sp.remove('vorlage', v.id);
     state.vorlage = state.vorlage.filter(x => x.id !== v.id); save();
@@ -1087,7 +1313,7 @@ const api = {
 const CFG_KEY = 'dho-sp-config-v1';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
-const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO Checkliste Vorlage' };
+const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO Checkliste Vorlage', personen: 'DHO Personen' };
 let msalApp = null, refreshTimer = null;
 
 function loadCfg() {
@@ -1206,7 +1432,7 @@ async function loadLive(interactive) {
     const lists = await sp.req('GET', `/sites/${site.id}/lists?$select=id,displayName&$top=200`);
     for (const [k, name] of Object.entries(LISTS)) {
       const l = lists.value.find(x => x.displayName === name);
-      if (!l && k !== 'vorlage') throw new Error(`Liste „${name}“ nicht gefunden – erst das Setup-Skript ausführen.`);
+      if (!l && (k === 'haeuser' || k === 'aufgaben')) throw new Error(`Liste „${name}“ nicht gefunden – erst das Setup-Skript ausführen.`);
       sp.lists[k] = l ? l.id : null;
     }
     const all = async key => {
@@ -1215,7 +1441,8 @@ async function loadLive(interactive) {
       while (url) { const j = await sp.req('GET', url); out.push(...j.value); url = j['@odata.nextLink']; }
       return out.map(i => i.fields);
     };
-    const [hs, ts, vs] = await Promise.all([all('haeuser'), all('aufgaben'), all('vorlage')]);
+    const [hs, ts, vs, ps] = await Promise.all([all('haeuser'), all('aufgaben'), all('vorlage'), all('personen')]);
+    const personen = ps.map(f => ({ id: +f.id, name: f.Title || '', rolle: f.Rolle || '', firma: f.Firma || '', email: f.EMail || '', aktiv: f.Aktiv !== false })).filter(p => p.name);
     const houses = hs.map(f => ({
       id: +f.id, ort: f.Ort || f.Title, name: f.Title || f.Ort, kuerzel: f.Hauskuerzel || '', ue: spDate(f.Uebernahmetag), x: spDate(f.GoLive),
       direktor: f.Direktor || '', pms: f.PMSChampion || '', oracle: f.OraclePL || '', accor: f.AccorKontakt || '',
@@ -1233,7 +1460,7 @@ async function loadLive(interactive) {
       id: +f.id, nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '', bezug: f.Bezug || 'fix',
       offset: numOrEmpty(f.OffsetTage), fristText: f.FristText || '', hinweis: f.Hinweis || '', aktiv: f.Aktiv !== false
     }));
-    state = Object.assign(emptyState(), { houses, tasks, vorlage, loadedAt: new Date(), live: u.pathname.split('/').pop() });
+    state = Object.assign(emptyState(), { houses, tasks, vorlage, personen, loadedAt: new Date(), live: u.pathname.split('/').pop() });
     sortHouses();
     $('#cMsg').textContent = '';
     if (!$('#dlg').open) render();
@@ -1347,6 +1574,17 @@ $('#btnNewVorlage').onclick = () => {
   const nr = Math.max(0, ...state.vorlage.map(v => +v.nr || 0)) + 1;
   vorlageForm({ nr, aufgabe: '', bereich: '', owner: '', bezug: 'X', offset: '', fristText: '', hinweis: '', aktiv: true }, true);
 };
+
+$('#btnNewPerson').onclick = () => personForm({ id: null, name: '', rolle: '', firma: '', email: '', aktiv: true }, true);
+$('#pbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-person]'); if (!tr) return;
+  personForm(state.personen.find(x => x.id === +tr.dataset.person), false);
+});
+$('#nbody').addEventListener('click', async e => {
+  const np = e.target.closest('button[data-np]'), nr = e.target.closest('button[data-nr]');
+  if (np) await runBusy(np, async () => { await api.savePerson({ name: np.dataset.np, rolle: '', firma: '', email: '', aktiv: true }, true); toast(`„${np.dataset.np}“ angelegt`); render(); });
+  if (nr) replaceForm(nr.dataset.nr);
+});
 
 // Tooltip
 const tip = $('#tip');
