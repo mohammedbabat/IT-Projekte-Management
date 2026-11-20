@@ -1063,7 +1063,16 @@ function replaceForm(alt) {
 const mailer = {
   enabled: () => !!(state.live && sp.cfg && sp.cfg.mail),
   isRecipient: p => !!p && p.aktiv !== false && p.benachrichtigen !== false && /@/.test(p.email || ''),
-  person: name => state.personen.find(p => p.name.toLowerCase() === String(name).toLowerCase()),
+  // exakter Name – sonst eindeutiger Treffer über Vor-/Nachname (z. B. „Babat“ → „Mohammed Babat“)
+  person(name) {
+    const n = String(name || '').trim().toLowerCase();
+    if (!n) return null;
+    const exakt = state.personen.find(p => p.name.toLowerCase() === n);
+    if (exakt) return exakt;
+    const woerter = n.split(/\s+/);
+    const treffer = state.personen.filter(p => p.aktiv !== false && woerter.every(w => p.name.toLowerCase().split(/\s+/).includes(w)));
+    return treffer.length === 1 ? treffer[0] : null;
+  },
   baseUrl() {
     const c = sp.cfg || {};
     const q = new URLSearchParams({ tenant: c.tenant || '', client: c.client || '', site: c.site || '' });
