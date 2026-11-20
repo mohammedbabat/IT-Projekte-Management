@@ -272,6 +272,7 @@
         <label>Tenant-ID<input id="cTenant" placeholder="xxxxxxxx-xxxx-… oder firma.onmicrosoft.com"></label>
         <label>Client-ID (App-Registrierung)<input id="cClient" placeholder="xxxxxxxx-xxxx-…"></label>
         <label class="span2">SharePoint-Site<input id="cSite" placeholder="https://<tenant>.sharepoint.com/sites/<site>"></label>
+        <label class="span2">Absender für E-Mails (Shared Mailbox, optional)<input id="cMail" placeholder="z. B. IT-Projekt@firma.de"></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="primary" id="cConnect">Anmelden und laden</button>
@@ -376,10 +377,17 @@
       <p class="muted small" style="margin-top:-4px">Diese Namen stehen im Feld „Zuständig / Ansprechpartner“ zur Auswahl. Man kann dort aber auch jederzeit einen Namen frei eintippen.</p>
       <div class="tablewrap">
         <table class="data">
-          <thead><tr><th>Name</th><th>Rolle / Funktion</th><th>Firma</th><th>E-Mail</th><th>Offene Aufgaben</th><th>Aktiv</th></tr></thead>
+          <thead><tr><th>Name</th><th>Rolle / Funktion</th><th>Firma</th><th>E-Mail</th><th>Benachrichtigen</th><th>Offene Aufgaben</th><th>Aktiv</th></tr></thead>
           <tbody id="pbody"></tbody>
         </table>
       </div>
+    </section>
+    <section class="card" id="mailCard">
+      <div class="card-head">
+        <h2>E-Mail-Benachrichtigung</h2>
+        <button class="primary" id="btnDigest">Wochenübersicht jetzt senden</button>
+      </div>
+      <div id="mailInfo" class="small"></div>
     </section>
     <section class="card">
       <h2>Namen in den Aufgaben</h2>
@@ -739,12 +747,24 @@ function renderHeat() {
 // ==================================================================
 // Trennung nur bei „ / “ (mit Leerzeichen), Komma, Semikolon oder Pfeil – „Direktor/in“ bleibt ein Name
 const splitOwners = o => String(o || '').split(/\s+\/\s+|\s*[,;]\s*|\s*→\s*/).map(s => s.trim()).filter(Boolean);
+function hashParams() { const i = location.hash.indexOf('?'); return new URLSearchParams(i >= 0 ? location.hash.slice(i + 1) : ''); }
 function renderAufgaben() {
   const keepH = $('#fHaus').value, keepO = $('#fOwner').value;
   $('#fHaus').innerHTML = '<option value="">Alle Häuser</option>' + state.houses.map(h => `<option value="${h.id}" ${String(h.id) === keepH ? 'selected' : ''}>${esc(h.ort)}</option>`).join('');
   const owners = [...new Set(state.tasks.flatMap(t => splitOwners(t.owner)))].sort((a, b) => a.localeCompare(b, 'de'));
   $('#fOwner').innerHTML = '<option value="">Alle Zuständigen</option>' + owners.map(o => `<option ${o === keepO ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  const hp = hashParams();
+  if (hp.get('person')) {
+    const n = hp.get('person');
+    if (![...$('#fOwner').options].some(o => o.value === n)) $('#fOwner').insertAdjacentHTML('beforeend', `<option>${esc(n)}</option>`);
+    $('#fOwner').value = n; $('#fStatus').value = 'offen-alle'; $('#fHaus').value = '';
+  }
   renderTable();
+  if (hp.get('task')) {
+    const t = state.tasks.find(x => x.id === +hp.get('task'));
+    history.replaceState(null, '', location.pathname + location.search + '#/aufgaben');
+    if (t) taskForm(t, false); else toast('Aufgabe nicht gefunden (evtl. gelöscht).', true);
+  }
 }
 function renderTable() {
   const fH = $('#fHaus').value, fS = $('#fStatus').value, fO = $('#fOwner').value, q = $('#fSearch').value.trim().toLowerCase();
@@ -965,12 +985,20 @@ function renderPersonen() {
   $('#personenHinweis').classList.toggle('hidden', !fehlt);
   $('#personenHinweis').innerHTML = fehlt ? '⚠ Die SharePoint-Liste „DHO Personen“ gibt es noch nicht. Einmal das Skript <b>DHO-Personen-Liste.ps1</b> ausführen, dann „Aktualisieren“. Bis dahin können Namen im Aufgabenformular frei eingetippt werden.' : '';
   $('#btnNewPerson').disabled = fehlt;
+  const mOn = mailer.enabled();
+  const empf = state.personen.filter(p => mailer.isRecipient(p));
+  $('#btnDigest').disabled = !mOn || !empf.length;
+  $('#mailInfo').innerHTML = !state.live ? '<span class="muted">E-Mails gibt es nur im Live-Modus (SharePoint).</span>'
+    : !mOn ? '<span class="muted">Kein Absender-Postfach eingerichtet – in der Startseite unter „Absender für E-Mails“ eintragen (oder Link mit &amp;mail=…).</span>'
+    : `Absender: <b>${esc(sp.cfg.mail)}</b> · Empfänger: <b>${empf.length}</b> Personen mit E-Mail und „Benachrichtigen“${sp.hatBenachrichtigen ? '' : ' <span class="muted">(Spalte „Benachrichtigen“ fehlt noch in SharePoint – Setup-Skript ausführen)</span>'}.<br>
+       <span class="muted">Automatisch: Mail an neu eingetragene Zuständige beim Speichern. Wochenübersicht: überfällige + in 14 Tagen fällige Aufgaben je Person.</span>`;
   const used = usedNames();
   const offen = n => state.tasks.filter(t => OPEN.includes(t.status) && splitOwners(t.owner).includes(n)).length;
   $('#pbody').innerHTML = [...state.personen].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(p =>
     `<tr class="click ${p.aktiv === false ? 'inactive' : ''}" data-person="${p.id}"><td><b>${esc(p.name)}</b></td><td>${esc(p.rolle || '')}</td><td>${esc(p.firma || '')}</td>
-     <td>${p.email ? `<a href="mailto:${esc(p.email)}" onclick="event.stopPropagation()">${esc(p.email)}</a>` : ''}</td><td>${offen(p.name)}</td><td>${p.aktiv === false ? 'nein' : 'ja'}</td></tr>`
-  ).join('') || '<tr><td colspan="6" class="muted" style="padding:16px">Noch keine Personen – „+ Neue Person“ oder unten bei „Namen in den Aufgaben“ übernehmen.</td></tr>';
+     <td>${p.email ? `<a href="mailto:${esc(p.email)}" onclick="event.stopPropagation()">${esc(p.email)}</a>` : '<span class="muted">–</span>'}</td>
+     <td>${!p.email ? '<span class="muted">keine E-Mail</span>' : p.benachrichtigen === false ? 'nein' : '✉ ja'}</td><td>${offen(p.name)}</td><td>${p.aktiv === false ? 'nein' : 'ja'}</td></tr>`
+  ).join('') || '<tr><td colspan="7" class="muted" style="padding:16px">Noch keine Personen – „+ Neue Person“ oder unten bei „Namen in den Aufgaben“ übernehmen.</td></tr>';
 
   const inListe = new Set(state.personen.map(p => p.name.toLowerCase()));
   const vorl = new Map(); for (const v of state.vorlage) for (const n of splitOwners(v.owner)) vorl.set(n, (vorl.get(n) || 0) + 1);
@@ -985,13 +1013,14 @@ function renderPersonen() {
 function personForm(p, isNew) {
   openForm({
     title: isNew ? 'Neue Person' : `Person – ${p.name}`,
-    values: Object.assign({ aktiv: true }, p),
+    values: Object.assign({ aktiv: true, benachrichtigen: true }, p),
     fields: [
       { k: 'name', label: 'Name', req: true, placeholder: 'Vor- und Nachname' },
       { k: 'rolle', label: 'Rolle / Funktion', placeholder: 'z. B. IT-Leitung, Revenue, Projektleitung Oracle' },
       { k: 'firma', label: 'Firma', list: 'dlFirma', placeholder: 'z. B. HON Service, Hotel, Accor, Oracle' },
       { k: 'email', label: 'E-Mail' },
-      { k: 'aktiv', label: 'Aktiv (in der Auswahl anzeigen)', type: 'checkbox', span: true }
+      { k: 'aktiv', label: 'Aktiv (in der Auswahl anzeigen)', type: 'checkbox', span: true },
+      { k: 'benachrichtigen', label: 'Per E-Mail benachrichtigen (neue Aufgaben + Wochenübersicht)', type: 'checkbox', span: true }
     ],
     onSave: async v => {
       if (state.personen.some(o => o.name.toLowerCase() === v.name.toLowerCase() && o.id !== p.id)) throw new Error(`„${v.name}“ gibt es bereits.`);
@@ -1009,11 +1038,139 @@ function replaceForm(alt) {
   openForm({
     title: `„${alt}“ ersetzen`,
     saveLabel: 'In allen Aufgaben ersetzen',
-    values: {},
-    fields: [{ k: 'neu', label: `„${alt}“ ersetzen durch`, type: 'people', span: true, req: true }],
+    values: { notify: true },
+    fields: [{ k: 'neu', label: `„${alt}“ ersetzen durch`, type: 'people', span: true, req: true },
+      ...(mailer.enabled() ? [{ k: 'notify', label: 'Neue Zuständige per E-Mail informieren (eine Sammelmail pro Person)', type: 'checkbox', span: true }] : [])],
     extra: `<p class="muted small" style="margin-top:16px">Betrifft ${state.tasks.filter(t => splitOwners(t.owner).includes(alt)).length} Aufgaben und ${state.vorlage.filter(t => splitOwners(t.owner).includes(alt)).length} Vorlagenpunkte. Andere Namen in denselben Einträgen bleiben erhalten.</p>`,
-    onSave: async v => { const n = await api.replaceName(alt, v.neu); toast(`${n} Einträge geändert`); render(); }
+    onSave: async v => {
+      const vorher = new Map(state.tasks.map(t => [t.id, t.owner]));
+      const n = await api.replaceName(alt, v.neu);
+      render();
+      let r = null;
+      if (v.notify) {
+        const paare = state.tasks.filter(t => vorher.get(t.id) !== t.owner && OPEN.includes(t.status)).map(t => [t, neueNamen(vorher.get(t.id), t.owner)]);
+        try { r = await benachrichtige(paare, `übertragen von „${alt}“`); } catch (e) { toast(e.message, true); return; }
+      }
+      toast(mailToast(`${n} Einträge geändert`, r));
+    }
   });
+}
+
+// ==================================================================
+// E-Mail (Graph sendMail aus Shared Mailbox, delegiert Mail.Send.Shared)
+// Layout nach Dorint CD 2023 – E-Mail-Regeln: Tabellen, bgcolor-Attribut, Inline-Styles mit !important, VML-Buttons
+// ==================================================================
+const mailer = {
+  enabled: () => !!(state.live && sp.cfg && sp.cfg.mail),
+  isRecipient: p => !!p && p.aktiv !== false && p.benachrichtigen !== false && /@/.test(p.email || ''),
+  person: name => state.personen.find(p => p.name.toLowerCase() === String(name).toLowerCase()),
+  baseUrl() {
+    const c = sp.cfg || {};
+    const q = new URLSearchParams({ tenant: c.tenant || '', client: c.client || '', site: c.site || '' });
+    if (c.mail) q.set('mail', c.mail);
+    return `${location.origin}${location.pathname}?${q}`;
+  },
+  taskLink: t => `${mailer.baseUrl()}#/aufgaben?task=${t.id}`,
+  personLink: name => `${mailer.baseUrl()}#/aufgaben?person=${encodeURIComponent(name)}`,
+  button(text, url) {
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#0e214a" style="background-color:#0e214a !important;">
+<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${esc(url)}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="0%" stroke="f" fillcolor="#0e214a"><w:anchorlock/><center style="color:#ffffff;font-family:'Trebuchet MS',Arial,sans-serif;font-size:14px;font-weight:bold;">${esc(text)}</center></v:roundrect><![endif]-->
+<!--[if !mso]><!--><a href="${esc(url)}" style="display:inline-block;padding:12px 24px;font-family:CorpoS,'Trebuchet MS',Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff !important;background-color:#0e214a !important;text-decoration:none;">${esc(text)}</a><!--<![endif]-->
+</td></tr></table>`;
+  },
+  layout({ titel, intro, inhalt, buttonText, buttonUrl }) {
+    const F = "font-family:CorpoS,'Trebuchet MS',Arial,sans-serif;";
+    return `<!DOCTYPE html><html lang="de" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(titel)}</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3ef !important;" bgcolor="#f5f3ef">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f3ef" style="background-color:#f5f3ef !important;"><tr><td align="center" style="padding:32px 8px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:640px;max-width:100%;">
+<tr><td bgcolor="#0e214a" style="background-color:#0e214a !important;padding:28px 32px;border-bottom:3px solid #c6baae;">
+  <div style="${F}font-size:12px;letter-spacing:4px;font-weight:bold;color:#c6baae;text-transform:uppercase;">Dorint · IT-Projekte</div>
+  <div style="${F}font-size:20px;line-height:28px;font-weight:bold;color:#ffffff;padding-top:8px;">${esc(titel)}</div>
+</td></tr>
+<tr><td bgcolor="#ffffff" style="background-color:#ffffff !important;padding:32px;${F}font-size:14px;line-height:22px;color:#3a3530;">
+  ${intro}
+  <div style="padding-top:24px;">${inhalt}</div>
+  ${buttonUrl ? `<div style="padding-top:24px;">${mailer.button(buttonText, buttonUrl)}</div>` : ''}
+</td></tr>
+<tr><td bgcolor="#f5f3ef" style="background-color:#f5f3ef !important;padding:16px 32px;${F}font-size:12px;line-height:18px;color:#8a8278;">
+  Automatische Nachricht aus dem DHO-Projektmanagement. Antworten gehen an ${esc(sp.cfg.mail)}.
+</td></tr>
+</table></td></tr></table></body></html>`;
+  },
+  tabelle(tasks) {
+    const F = "font-family:CorpoS,'Trebuchet MS',Arial,sans-serif;";
+    const th = t => `<td bgcolor="#0e214a" style="background-color:#0e214a !important;padding:8px;${F}font-size:12px;font-weight:bold;color:#ffffff;white-space:nowrap;">${t}</td>`;
+    const rows = tasks.map(t => {
+      const over = isOverdue(t);
+      const frist = t.frist ? fmt(t.frist) + (over ? ` (${-daysUntil(t.frist)} T. drüber)` : '') : (t.fristText || '–');
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #ece7e0;${F}font-size:13px;color:#3a3530;white-space:nowrap;vertical-align:top;">${esc(t.haus)}</td>
+        <td style="padding:8px;border-bottom:1px solid #ece7e0;${F}font-size:13px;color:#3a3530;vertical-align:top;"><a href="${esc(mailer.taskLink(t))}" style="color:#0e214a;font-weight:bold;text-decoration:none;">${t.nr}. ${esc(t.aufgabe)}</a>${t.hinweis ? `<div style="font-size:12px;color:#8a8278;padding-top:2px;">${esc(t.hinweis)}</div>` : ''}</td>
+        <td style="padding:8px;border-bottom:1px solid #ece7e0;${F}font-size:13px;white-space:nowrap;vertical-align:top;${over ? 'color:#9a1f17;font-weight:bold;' : 'color:#3a3530;'}">${frist}</td></tr>`;
+    }).join('');
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>${th('Haus')}${th('Aufgabe')}${th('Bis wann?')}</tr>${rows}</table>`;
+  },
+  // Map Name -> Aufgaben  =>  je Empfänger eine Mail
+  async zuweisungen(proName, kontext) {
+    const gesendet = [], ohne = [], mails = [];
+    for (const [name, tasks] of proName) {
+      const p = mailer.person(name);
+      if (!mailer.isRecipient(p)) { ohne.push(name); continue; }
+      const sorted = [...tasks].sort((a, b) => ((a.frist || new Date(9e15)) - (b.frist || new Date(9e15))) || a.nr - b.nr);
+      const einzel = sorted.length === 1, t = sorted[0];
+      const titel = einzel ? `Neue Aufgabe: ${t.haus} – ${t.aufgabe}`.slice(0, 140) : `${sorted.length} neue Aufgaben${kontext ? ' – ' + kontext : ''}`;
+      const intro = `<p style="margin:0;">Hallo ${esc(p.name.split(' ')[0])},</p><p style="margin:16px 0 0;">${einzel
+        ? `du bist als <b>zuständig / Ansprechpartner</b> für folgende Aufgabe eingetragen:`
+        : `du bist für <b>${sorted.length} Aufgaben</b> als zuständig / Ansprechpartner eingetragen${kontext ? ` (${esc(kontext)})` : ''}:`}</p>`;
+      const inhalt = mailer.tabelle(sorted) + (einzel && t.notiz ? `<p style="margin:16px 0 0;color:#8a8278;font-size:13px;">Notiz: ${esc(t.notiz)}</p>` : '');
+      mails.push({ to: p.email, subject: titel, html: mailer.layout({ titel, intro, inhalt, buttonText: einzel ? 'Aufgabe öffnen' : 'Meine Aufgaben öffnen', buttonUrl: einzel ? mailer.taskLink(t) : mailer.personLink(p.name) }) });
+      gesendet.push(p.name);
+    }
+    if (mails.length) await mailer.send(mails);
+    return { gesendet, ohne };
+  },
+  async wochenuebersicht() {
+    const bis = addDays(today, 14), mails = [], gesendet = [], leer = [];
+    for (const p of state.personen.filter(mailer.isRecipient)) {
+      const meine = state.tasks.filter(t => OPEN.includes(t.status) && splitOwners(t.owner).some(n => n.toLowerCase() === p.name.toLowerCase()));
+      const over = meine.filter(isOverdue).sort((a, b) => a.frist - b.frist);
+      const bald = meine.filter(t => !isOverdue(t) && t.frist && t.frist <= bis).sort((a, b) => a.frist - b.frist);
+      if (!over.length && !bald.length) { leer.push(p.name); continue; }
+      const titel = `Deine Wochenübersicht – ${over.length} überfällig, ${bald.length} in 14 Tagen fällig`;
+      const intro = `<p style="margin:0;">Hallo ${esc(p.name.split(' ')[0])},</p><p style="margin:16px 0 0;">hier ist dein Stand der DHO-Übernahmen zum ${fmt(today)}. Insgesamt hast du <b>${meine.length} offene Aufgaben</b>.</p>`;
+      const h = (txt, farbe) => `<div style="font-family:CorpoS,'Trebuchet MS',Arial,sans-serif;font-size:15px;font-weight:bold;color:#0e214a;border-left:3px solid ${farbe};padding:0 0 0 8px;margin:24px 0 8px;">${txt}</div>`;
+      const inhalt = (over.length ? h(`Überfällig (${over.length})`, '#b3261e') + mailer.tabelle(over) : '') + (bald.length ? h(`Fällig in den nächsten 14 Tagen (${bald.length})`, '#d9a21b') + mailer.tabelle(bald) : '');
+      mails.push({ to: p.email, subject: titel, html: mailer.layout({ titel: 'Deine Wochenübersicht', intro, inhalt, buttonText: 'Meine Aufgaben öffnen', buttonUrl: mailer.personLink(p.name) }) });
+      gesendet.push(p.name);
+    }
+    if (mails.length) await mailer.send(mails);
+    return { gesendet, leer };
+  },
+  async send(mails) {
+    const url = `/users/${sp.cfg.mail.trim()}/sendMail`;
+    try {
+      await sp.batch(mails.map(m => ({ method: 'POST', url, body: { message: { subject: m.subject, body: { contentType: 'HTML', content: m.html }, toRecipients: [{ emailAddress: { address: m.to } }] }, saveToSentItems: true } })), 'E-Mails');
+    } catch (e) {
+      if (/403|SendAs|Access is denied|AccessDenied/i.test(e.message)) throw new Error(`E-Mail nicht gesendet: Dir fehlt „Senden als“ für ${sp.cfg.mail} (Setup-Skript ausführen). Die Daten sind gespeichert.`);
+      throw new Error('E-Mail-Versand fehlgeschlagen: ' + e.message + ' – die Daten sind gespeichert.');
+    }
+  }
+};
+// Welche Namen sind neu dazugekommen?
+const neueNamen = (altOwner, neuOwner) => { const alt = new Set(splitOwners(altOwner).map(n => n.toLowerCase())); return splitOwners(neuOwner).filter(n => !alt.has(n.toLowerCase())); };
+function gruppiereNachName(paare) { // [[task, [namen]]] -> Map Name -> [tasks]
+  const m = new Map();
+  for (const [t, namen] of paare) for (const n of namen) { const k = (mailer.person(n) || { name: n }).name; if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+  return m;
+}
+const kurz = l => l.length > 4 ? l.slice(0, 4).join(', ') + ` +${l.length - 4} weitere` : l.join(', ');
+const mailToast = (basis, r) => basis + (r && r.gesendet.length ? ` · ✉ benachrichtigt: ${kurz(r.gesendet)}` : '') + (r && r.ohne.length ? ` · ohne E-Mail (keine Mail): ${kurz(r.ohne)}` : '');
+async function benachrichtige(paare, kontext) {
+  if (!mailer.enabled()) return null;
+  const m = gruppiereNachName(paare.filter(([, n]) => n.length));
+  if (!m.size) return null;
+  return mailer.zuweisungen(m, kontext);
 }
 
 // ---------- Detailansicht: erledigt / nicht erledigt ----------
@@ -1063,7 +1220,7 @@ function taskForm(t, isNew) {
   const houseOpts = state.houses.map(h => [h.id, h.ort]);
   openForm({
     title: isNew ? 'Neue Aufgabe' : `Aufgabe ${t.nr} – ${t.haus}`,
-    values: t,
+    values: Object.assign({ notify: true }, t),
     fields: [
       { k: 'hausId', label: 'Haus', type: 'select', options: houseOpts, req: true },
       { k: 'nr', label: 'Nr.', type: 'number' },
@@ -1077,13 +1234,19 @@ function taskForm(t, isNew) {
       { k: 'frist', label: 'Bis wann?', type: 'date', help: '<a href="#" id="calcFrist">aus Bezug + Offset berechnen</a>' },
       { k: 'fristText', label: 'Frist-Text', placeholder: 'z. B. sofort, laufend' },
       { k: 'notiz', label: 'Antwort / Notiz', type: 'textarea', span: true, rows: 4 },
-      { k: 'hinweis', label: 'Hinweis', type: 'textarea', span: true, rows: 2 }
+      { k: 'hinweis', label: 'Hinweis', type: 'textarea', span: true, rows: 2 },
+      ...(mailer.enabled() ? [{ k: 'notify', label: 'Neu eingetragene Zuständige per E-Mail benachrichtigen', type: 'checkbox', span: true }] : [])
     ],
     onSave: async v => {
       const h = state.houses.find(x => String(x.id) === String(v.hausId));
+      const notify = v.notify; delete v.notify;
       const neu = Object.assign({}, t, v, { hausId: h.id, haus: h.ort });
       await api.saveTask(neu, isNew);
-      toast(isNew ? 'Aufgabe angelegt' : 'Aufgabe gespeichert'); render();
+      const basis = isNew ? 'Aufgabe angelegt' : 'Aufgabe gespeichert';
+      render();
+      let r = null;
+      if (notify) { try { r = await benachrichtige([[neu, neueNamen(isNew ? '' : t.owner, neu.owner)]]); } catch (e) { toast(e.message, true); return; } }
+      toast(mailToast(basis, r));
     },
     onDelete: isNew ? null : async () => { await api.deleteTask(t); toast('Aufgabe gelöscht'); render(); }
   });
@@ -1105,7 +1268,7 @@ function houseForm(h, isNew) {
   openForm({
     title: isNew ? 'Neues Haus anlegen' : `Haus bearbeiten – ${h.ort}`,
     saveLabel: isNew ? 'Haus + Checkliste anlegen' : 'Speichern',
-    values: Object.assign({ projektstatus: 'in Vorbereitung', mitCheckliste: true, neuBerechnen: true }, h),
+    values: Object.assign({ projektstatus: 'in Vorbereitung', mitCheckliste: true, neuBerechnen: true, notify: true }, h),
     fields: [
       { k: 'name', label: 'Hotelname', span: true, req: true, placeholder: 'z. B. Mercure Hotel Musterstadt City' },
       { k: 'ort', label: 'Ort', req: true },
@@ -1118,19 +1281,26 @@ function houseForm(h, isNew) {
       { k: 'projektstatus', label: 'Projektstatus', type: 'select', options: PROJEKTSTATUS },
       { k: 'accor', label: 'Accor-Ansprechpartner', type: 'textarea', span: true, rows: 2 },
       isNew ? { k: 'mitCheckliste', label: `Standort-Checkliste aus der Vorlage erzeugen (${aktiveVorlage} Punkte, Fristen aus Ü/X)`, type: 'checkbox', span: true }
-        : { k: 'neuBerechnen', label: 'Bei geändertem Ü/X: Fristen aller offenen Aufgaben neu berechnen', type: 'checkbox', span: true }
+        : { k: 'neuBerechnen', label: 'Bei geändertem Ü/X: Fristen aller offenen Aufgaben neu berechnen', type: 'checkbox', span: true },
+      ...(isNew && mailer.enabled() ? [{ k: 'notify', label: 'Zuständige per E-Mail informieren (eine Sammelmail pro Person)', type: 'checkbox', span: true }] : [])
     ],
     extra: isNew ? '' : `<p class="muted small" style="margin:12px 0 0">${nTasks} Aufgaben in der Checkliste. ${nTasks === 0 && aktiveVorlage ? '<button type="button" class="small" id="btnGenCl">Checkliste jetzt aus Vorlage erzeugen</button>' : ''}</p>`,
     onSave: async v => {
       if (state.houses.some(o => o.ort.toLowerCase() === v.ort.toLowerCase() && o.id !== h.id)) throw new Error(`Ein Haus mit Ort „${v.ort}“ gibt es bereits.`);
       if (isNew) {
-        const neu = Object.assign({}, v, { checkliste: false }); delete neu.mitCheckliste;
+        const neu = Object.assign({}, v, { checkliste: false }); delete neu.mitCheckliste; delete neu.notify;
         await api.saveHouse(neu, true);
-        if (v.mitCheckliste) { const n = await api.createChecklist(neu); toast(`Haus „${neu.ort}“ angelegt – ${n} Checklistenpunkte erzeugt`); }
+        if (v.mitCheckliste) {
+          const n = await api.createChecklist(neu);
+          const basis = `Haus „${neu.ort}“ angelegt – ${n} Checklistenpunkte erzeugt`;
+          let r = null;
+          if (v.notify) { try { r = await benachrichtige(tasksOf(neu).map(t => [t, splitOwners(t.owner)]), `neues Haus ${neu.ort}`); } catch (e) { sortHouses(); render(); toast(e.message, true); return; } }
+          toast(mailToast(basis, r));
+        }
         else toast(`Haus „${neu.ort}“ angelegt`);
       } else {
         const datesChanged = iso(v.ue) !== iso(h.ue) || iso(v.x) !== iso(h.x);
-        const neu = Object.assign({}, h, v); delete neu.neuBerechnen;
+        const neu = Object.assign({}, h, v); delete neu.neuBerechnen; delete neu.notify;
         await api.saveHouse(neu, false, h);
         if (datesChanged && v.neuBerechnen) { const n = await api.recalcFristen(neu); toast(`Gespeichert – ${n} Fristen neu berechnet`); }
         else toast('Haus gespeichert');
@@ -1183,7 +1353,7 @@ const taskFields = t => ({
   Bezug: t.bezug || 'fix', OffsetTage: spNum(t.offset), Frist: spDateOut(t.frist), FristText: t.fristText || '',
   Status: t.status, ErledigtAm: spDateOut(t.erledigtAm), Notiz: t.notiz || '', Hinweis: t.hinweis || ''
 });
-const personFields = p => ({ Title: p.name, Rolle: p.rolle || '', Firma: p.firma || '', EMail: p.email || '', Aktiv: p.aktiv !== false });
+const personFields = p => Object.assign({ Title: p.name, Rolle: p.rolle || '', Firma: p.firma || '', EMail: p.email || '', Aktiv: p.aktiv !== false }, sp.hatBenachrichtigen ? { Benachrichtigen: p.benachrichtigen !== false } : {});
 const vorlageFields = v => ({
   Title: v.aufgabe, Nr: spNum(v.nr), Bereich: v.bereich || '', Owner: v.owner || '', Bezug: v.bezug || 'fix',
   OffsetTage: spNum(v.offset), FristText: v.fristText || '', Hinweis: v.hinweis || '', Aktiv: v.aktiv !== false
@@ -1312,7 +1482,8 @@ const api = {
 // ==================================================================
 const CFG_KEY = 'dho-sp-config-v1';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
-const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
+const SCOPES_BASIS = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
+const scopesFor = c => c && c.mail ? SCOPES_BASIS.concat('https://graph.microsoft.com/Mail.Send.Shared') : SCOPES_BASIS;
 const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO Checkliste Vorlage', personen: 'DHO Personen' };
 let msalApp = null, refreshTimer = null;
 
@@ -1320,12 +1491,12 @@ function loadCfg() {
   let c = {};
   try { c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch (e) { }
   const p = new URLSearchParams(location.search);
-  for (const k of ['tenant', 'client', 'site']) if (p.get(k)) c[k] = p.get(k);
+  for (const k of ['tenant', 'client', 'site', 'mail']) if (p.get(k)) c[k] = p.get(k);
   return c;
 }
 function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) { } }
 const cfgComplete = c => c.tenant && c.client && /^https:\/\/[^/]+\.sharepoint\.com\/sites\/[^/]+/i.test(c.site || '');
-function fillCfgForm(c) { $('#cTenant').value = c.tenant || ''; $('#cClient').value = c.client || ''; $('#cSite').value = c.site || ''; }
+function fillCfgForm(c) { $('#cTenant').value = c.tenant || ''; $('#cClient').value = c.client || ''; $('#cSite').value = c.site || ''; $('#cMail').value = c.mail || ''; }
 
 async function getMsal(c) {
   if (typeof msal === 'undefined') throw new Error('MSAL-Bibliothek nicht geladen (lib/msal-browser.min.js).');
@@ -1346,14 +1517,14 @@ async function getToken(c, interactive) {
   if (!account) {
     if (!interactive) return null;
     $('#cMsg').textContent = 'Weiterleitung zur Microsoft-Anmeldung …';
-    await app.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+    await app.loginRedirect({ scopes: scopesFor(c), prompt: 'select_account' });
     return null;
   }
   if (app.setActiveAccount) app.setActiveAccount(account);
-  try { return (await app.acquireTokenSilent({ scopes: SCOPES, account })).accessToken; }
+  try { return (await app.acquireTokenSilent({ scopes: scopesFor(c), account })).accessToken; }
   catch (e) {
     if (!interactive) return null;
-    await app.acquireTokenRedirect({ scopes: SCOPES, account });
+    await app.acquireTokenRedirect({ scopes: scopesFor(c), account });
     return null;
   }
 }
@@ -1374,6 +1545,10 @@ const sp = {
     return r.status === 204 ? null : r.json();
   },
   listUrl(key) { return `/sites/${this.siteId}/lists/${this.lists[key]}`; },
+  async hasColumn(key, name) {
+    if (!this.lists[key]) return false;
+    try { const j = await this.req('GET', `${this.listUrl(key)}/columns?$select=name`); return j.value.some(c => c.name === name); } catch (e) { return false; }
+  },
   itemUrl(key, id) { return `${this.listUrl(key)}/items/${id}`; },
   create(key, fields) { return this.req('POST', this.listUrl(key) + '/items', { fields }); },
   update(key, id, fields) { return this.req('PATCH', this.itemUrl(key, id) + '/fields', fields); },
@@ -1442,7 +1617,8 @@ async function loadLive(interactive) {
       return out.map(i => i.fields);
     };
     const [hs, ts, vs, ps] = await Promise.all([all('haeuser'), all('aufgaben'), all('vorlage'), all('personen')]);
-    const personen = ps.map(f => ({ id: +f.id, name: f.Title || '', rolle: f.Rolle || '', firma: f.Firma || '', email: f.EMail || '', aktiv: f.Aktiv !== false })).filter(p => p.name);
+    sp.hatBenachrichtigen = ps.some(f => 'Benachrichtigen' in f) || await sp.hasColumn('personen', 'Benachrichtigen');
+    const personen = ps.map(f => ({ id: +f.id, name: f.Title || '', rolle: f.Rolle || '', firma: f.Firma || '', email: f.EMail || '', aktiv: f.Aktiv !== false, benachrichtigen: f.Benachrichtigen !== false })).filter(p => p.name);
     const houses = hs.map(f => ({
       id: +f.id, ort: f.Ort || f.Title, name: f.Title || f.Ort, kuerzel: f.Hauskuerzel || '', ue: spDate(f.Uebernahmetag), x: spDate(f.GoLive),
       direktor: f.Direktor || '', pms: f.PMSChampion || '', oracle: f.OraclePL || '', accor: f.AccorKontakt || '',
@@ -1511,7 +1687,7 @@ $('#btnForget').onclick = () => {
   state = emptyState(); render();
 };
 $('#cConnect').onclick = () => {
-  const c = { tenant: $('#cTenant').value.trim(), client: $('#cClient').value.trim(), site: $('#cSite').value.trim().replace(/\/+$/, '') };
+  const c = { tenant: $('#cTenant').value.trim(), client: $('#cClient').value.trim(), site: $('#cSite').value.trim().replace(/\/+$/, ''), mail: $('#cMail').value.trim() };
   if (!cfgComplete(c)) { $('#cMsg').textContent = '⚠ Bitte alle drei Felder korrekt ausfüllen.'; return; }
   saveCfg(c); msalApp = null; loadLive(true);
 };
@@ -1575,14 +1751,22 @@ $('#btnNewVorlage').onclick = () => {
   vorlageForm({ nr, aufgabe: '', bereich: '', owner: '', bezug: 'X', offset: '', fristText: '', hinweis: '', aktiv: true }, true);
 };
 
-$('#btnNewPerson').onclick = () => personForm({ id: null, name: '', rolle: '', firma: '', email: '', aktiv: true }, true);
+$('#btnNewPerson').onclick = () => personForm({ id: null, name: '', rolle: '', firma: '', email: '', aktiv: true, benachrichtigen: true }, true);
+$('#btnDigest').onclick = async () => {
+  const empf = state.personen.filter(mailer.isRecipient);
+  if (!confirm(`Wochenübersicht an ${empf.length} Personen senden (nur wer überfällige oder bald fällige Aufgaben hat)?`)) return;
+  await runBusy($('#btnDigest'), async () => {
+    const r = await mailer.wochenuebersicht();
+    toast(`✉ Wochenübersicht gesendet an ${r.gesendet.length}: ${r.gesendet.join(', ') || '–'}${r.leer.length ? ` · nichts fällig bei: ${r.leer.join(', ')}` : ''}`);
+  });
+};
 $('#pbody').addEventListener('click', e => {
   const tr = e.target.closest('tr[data-person]'); if (!tr) return;
   personForm(state.personen.find(x => x.id === +tr.dataset.person), false);
 });
 $('#nbody').addEventListener('click', async e => {
   const np = e.target.closest('button[data-np]'), nr = e.target.closest('button[data-nr]');
-  if (np) await runBusy(np, async () => { await api.savePerson({ name: np.dataset.np, rolle: '', firma: '', email: '', aktiv: true }, true); toast(`„${np.dataset.np}“ angelegt`); render(); });
+  if (np) await runBusy(np, async () => { await api.savePerson({ name: np.dataset.np, rolle: '', firma: '', email: '', aktiv: true, benachrichtigen: true }, true); toast(`„${np.dataset.np}“ angelegt`); render(); });
   if (nr) replaceForm(nr.dataset.nr);
 });
 

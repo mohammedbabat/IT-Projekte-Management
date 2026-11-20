@@ -123,4 +123,13 @@ Status „erledigt“ setzt automatisch „Erledigt am“. Beim Bearbeiten werde
 Massenänderungen (Checkliste anlegen, Fristen neu berechnen, Haus löschen) laufen gebündelt über Graph `$batch`.
 Im Datei-Modus (Excel/CSV) funktioniert alles ebenfalls, Änderungen bleiben dann aber nur im Browser.
 
+### E-Mail-Benachrichtigung
+
+- Absender ist eine Shared Mailbox (Parameter `&mail=` im Link bzw. Feld auf der Startseite), Versand per Graph `sendMail` mit delegiertem `Mail.Send.Shared` – die angemeldete Person braucht „Senden als“ auf dem Postfach.
+- **Sofort-Mail:** Wer beim Speichern neu als „Zuständig / Ansprechpartner“ eingetragen wird, bekommt eine Mail (Haken im Formular). Neues Haus bzw. „Ersetzen“: eine Sammelmail pro Person.
+- **Wochenübersicht:** Seite „Personen“ → überfällige + in 14 Tagen fällige Aufgaben je Person.
+- Empfänger nur, wenn die Person in der Liste „DHO Personen“ eine E-Mail hat, aktiv ist und „Benachrichtigen“ nicht ausgeschaltet ist.
+- Links in der Mail: `#/aufgaben?task=<ID>` öffnet die Aufgabe, `#/aufgaben?person=<Name>` filtert „Meine Aufgaben“.
+- Layout nach Dorint CD für E-Mails: Tabellen, `bgcolor`-Attribute, Inline-Styles mit `!important`, VML-Buttons für Outlook.
+
 Die Bibliothek `lib/msal-browser.min.js` (MSAL 2.39.0, MIT-Lizenz) liegt im Repo, damit die Seite ohne fremdes CDN anmeldet.
