@@ -132,4 +132,10 @@ Im Datei-Modus (Excel/CSV) funktioniert alles ebenfalls, Änderungen bleiben dan
 - Links in der Mail: `#/aufgaben?task=<ID>` öffnet die Aufgabe, `#/aufgaben?person=<Name>` filtert „Meine Aufgaben“.
 - Layout nach Dorint CD für E-Mails: Tabellen, `bgcolor`-Attribute, Inline-Styles mit `!important`, VML-Buttons für Outlook.
 
+### Zugriff nur für das Projektteam
+
+Die Unternehmensanwendung (Entra ID) steht auf „Zuweisung erforderlich“, zugewiesen ist eine Sicherheitsgruppe
+(z. B. `SG-DHO-Projektteam`). Nur Mitglieder können sich anmelden; alle anderen weist Microsoft bei der Anmeldung ab
+(AADSTS50105), das Dashboard zeigt dazu einen Hinweis. Dieselbe Gruppe hat Bearbeitungsrechte auf der SharePoint-Site.
+
 Die Bibliothek `lib/msal-browser.min.js` (MSAL 2.39.0, MIT-Lizenz) liegt im Repo, damit die Seite ohne fremdes CDN anmeldet.

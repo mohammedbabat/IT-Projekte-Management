@@ -266,6 +266,14 @@
   <!-- ================= Start ================= -->
   <div id="start">
     <section class="card" id="liveStart">
+      <div id="loginSimple" class="hidden" style="text-align:center;padding:16px 0">
+        <h2 style="font-size:20px">Willkommen im DHO-Projektmanagement</h2>
+        <p class="muted" style="margin:0 0 24px">Melde dich mit deinem Microsoft-Konto an. Zugriff haben nur freigeschaltete Mitglieder des Projektteams.</p>
+        <button class="primary" id="btnLogin" style="font-size:15px;padding:12px 32px">Mit Microsoft anmelden</button>
+        <div id="loginMsg" class="small" style="margin-top:16px"></div>
+      </div>
+      <details id="cfgDetails" open>
+      <summary class="small muted" style="cursor:pointer;margin-bottom:16px">Verbindungseinstellungen</summary>
       <h2>Live aus SharePoint (empfohlen)</h2>
       <p class="muted small" style="margin-top:-6px">Liest und speichert direkt in den Listen „DHO Häuser“, „DHO Aufgaben“ und „DHO Checkliste Vorlage“ – mit deiner Microsoft-Anmeldung und deinen SharePoint-Rechten.</p>
       <div class="form" style="margin-bottom:12px">
@@ -278,6 +286,7 @@
         <button class="primary" id="cConnect">Anmelden und laden</button>
         <span class="muted small" id="cMsg"></span>
       </div>
+      </details>
     </section>
     <div id="drop">
       <h2>… oder Checklisten-Datei hierher ziehen</h2>
@@ -1539,7 +1548,9 @@ async function getMsal(c) {
       cache: { cacheLocation: 'localStorage' }
     });
     if (msalApp.initialize) await msalApp.initialize();
-    const res = await msalApp.handleRedirectPromise();
+    let res = null;
+    try { res = await msalApp.handleRedirectPromise(); }
+    catch (e) { loginFehler(e); throw e; }
     if (res && res.account && msalApp.setActiveAccount) msalApp.setActiveAccount(res.account);
   }
   return msalApp;
@@ -1682,8 +1693,11 @@ async function loadLive(interactive) {
   } catch (e) {
     console.error(e);
     let hint = '';
-    if (/AADSTS50011|redirect/i.test(e.message)) hint = ` – Redirect-URI „${location.origin + location.pathname}“ in der App-Registrierung als SPA eintragen.`;
+    loginFehler(e);
+    if (/AADSTS50105|AADSTS50020|AADSTS90072|not assigned|nicht zugewiesen/i.test(e.message)) hint = '';
+    else if (/AADSTS50011|redirect/i.test(e.message)) hint = ` – Redirect-URI „${location.origin + location.pathname}“ in der App-Registrierung als SPA eintragen.`;
     else if (/AADSTS65001|consent/i.test(e.message)) hint = ' – Berechtigung Sites.ReadWrite.All (Graph, delegiert) erteilen und Administratorzustimmung geben.';
+    if (/AADSTS50105|AADSTS50020|AADSTS90072|user_cancelled|AADSTS50058/i.test(e.message)) return false;  // Hinweis steht schon auf der Anmeldeseite
     $('#cMsg').textContent = '⚠ ' + e.message + hint;
     toast(e.message + hint, true);
     return false;
@@ -1847,10 +1861,27 @@ document.addEventListener('mousemove', e => {
 });
 
 // ==================================================================
+// Anmeldeseite: einfacher Knopf, wenn die Verbindung bekannt ist
+function zeigeLoginSeite() {
+  const ok = cfgComplete(loadCfg());
+  $('#loginSimple').classList.toggle('hidden', !ok);
+  $('#cfgDetails').open = !ok;
+  $('#drop').classList.toggle('hidden', ok);
+}
+function loginFehler(e) {
+  const m = (e && (e.errorMessage || e.message)) || String(e);
+  let text = '';
+  if (/AADSTS50105|not assigned|nicht zugewiesen/i.test(m)) text = '⛔ Dein Microsoft-Konto ist für das DHO-Dashboard nicht freigeschaltet. Bitte beim IT-Team melden, damit du in die Gruppe des Projektteams aufgenommen wirst.';
+  else if (/AADSTS50020|AADSTS90072/i.test(m)) text = '⛔ Dieses Konto gehört nicht zu unserem Unternehmen. Bitte mit dem Firmenkonto anmelden.';
+  else if (/user_cancelled|AADSTS50058/i.test(m)) text = 'Anmeldung abgebrochen.';
+  if (text) { $('#loginMsg').innerHTML = `<span style="color:var(--critical);font-weight:700">${esc(text)}</span>`; $('#cMsg').textContent = text; }
+}
+$('#btnLogin').onclick = () => { $('#loginMsg').textContent = 'Weiterleitung zu Microsoft …'; loadLive(true); };
+
 // Start: Live-Modus, wenn konfiguriert und angemeldet – sonst lokale Daten
 // ==================================================================
 (async () => {
-  const c = loadCfg(); fillCfgForm(c);
+  const c = loadCfg(); fillCfgForm(c); zeigeLoginSeite();
   if (cfgComplete(c)) { saveCfg(c); if (await loadLive(false)) return; }
   restore(); render();
 })();
