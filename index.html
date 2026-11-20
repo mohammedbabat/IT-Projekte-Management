@@ -648,21 +648,29 @@ async function getMsal(c) {
       cache: { cacheLocation: 'localStorage' }
     });
     if (msalApp.initialize) await msalApp.initialize();
-    await msalApp.handleRedirectPromise();
+    const res = await msalApp.handleRedirectPromise();
+    if (res && res.account && msalApp.setActiveAccount) msalApp.setActiveAccount(res.account);
   }
   return msalApp;
 }
 async function getToken(c, interactive) {
   const app = await getMsal(c);
-  let account = app.getAllAccounts()[0];
+  // Anmeldung per Weiterleitung statt Popup (Popup-Blocker verhindern sonst den Login)
+  let account = app.getActiveAccount ? app.getActiveAccount() : null;
+  if (!account) account = app.getAllAccounts()[0];
   if (!account) {
     if (!interactive) return null;
-    account = (await app.loginPopup({ scopes: SCOPES, prompt: 'select_account' })).account;
+    $('#cMsg').textContent = 'Weiterleitung zur Microsoft-Anmeldung …';
+    await app.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+    return null; // Seite wird verlassen, nach Rückkehr lädt der Start-Code automatisch
   }
+  if (app.setActiveAccount) app.setActiveAccount(account);
   try { return (await app.acquireTokenSilent({ scopes: SCOPES, account })).accessToken; }
   catch (e) {
     if (!interactive) return null;
-    return (await app.acquireTokenPopup({ scopes: SCOPES, account })).accessToken;
+    $('#cMsg').textContent = 'Weiterleitung zur Microsoft-Anmeldung …';
+    await app.acquireTokenRedirect({ scopes: SCOPES, account });
+    return null;
   }
 }
 async function graph(url, token) {
@@ -688,7 +696,7 @@ async function loadLive(interactive) {
   const btn = $('#btnRefresh'); btn.disabled = true; $('#cMsg').textContent = 'Verbinde …';
   try {
     const token = await getToken(c, interactive);
-    if (!token) { $('#cMsg').textContent = 'Bitte „Anmelden und laden“ klicken.'; return false; }
+    if (!token) { if (!interactive) $('#cMsg').textContent = 'Bitte „Anmelden und laden“ klicken.'; return false; }
     const u = new URL(c.site);
     const site = await graph(`/sites/${u.hostname}:${u.pathname}`, token);
     const items = name => graphAll(`/sites/${site.id}/lists/${encodeURIComponent(name)}/items?expand=fields&$top=999`, token);
