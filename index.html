@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DHO Hotelübernahmen – IT-Dashboard</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="lib/msal-browser.min.js"></script>
 <style>
   :root {
     color-scheme: light;
@@ -138,6 +139,8 @@
     <div class="sub" id="stand">Keine Daten geladen</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btnLive" class="primary">Live aus SharePoint</button>
+    <button id="btnRefresh" class="hidden" title="Daten neu aus SharePoint laden">↻ Aktualisieren</button>
     <label class="btn" for="file">Excel/CSV laden</label>
     <input type="file" id="file" accept=".xlsx,.xlsm,.csv" multiple class="hidden">
     <button id="btnForget" class="hidden" title="Gespeicherte Daten aus diesem Browser löschen">Daten vergessen</button>
@@ -145,8 +148,22 @@
 </header>
 
 <main>
+  <section class="card" id="liveStart">
+    <h2>Live aus SharePoint (empfohlen)</h2>
+    <p class="muted small" style="margin-top:-6px">Liest die Listen „DHO Häuser“, „DHO Aufgaben“ und „DHO Checkliste Vorlage“ direkt mit deiner Microsoft-Anmeldung. Es werden keine Daten gespeichert oder hochgeladen.</p>
+    <div class="gen">
+      <label>Tenant-ID<input id="cTenant" placeholder="xxxxxxxx-xxxx-…"></label>
+      <label>Client-ID (App-Registrierung)<input id="cClient" placeholder="xxxxxxxx-xxxx-…"></label>
+      <label style="grid-column: span 2">SharePoint-Site<input id="cSite" placeholder="https://<tenant>.sharepoint.com/sites/<site>"></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="primary" id="cConnect">Anmelden und laden</button>
+      <span class="muted small" id="cMsg"></span>
+    </div>
+  </section>
+
   <div id="drop">
-    <h2>Checklisten-Datei hierher ziehen</h2>
+    <h2>… oder Checklisten-Datei hierher ziehen</h2>
     <p><b>IT-Checklisten_Standorte.xlsx</b> (ein Blatt pro Haus + Blatt „Vorlage“)</p>
     <p>optional zusätzlich: <b>PM_Checkliste_DHO_Uebernahmen.xlsx</b> (für „Nächste Termine“)</p>
     <p>oder CSV-Export: DHO_Haeuser.csv + DHO_Aufgaben_Bestand.csv</p>
@@ -390,6 +407,7 @@ async function loadFiles(files) {
 // Speichern im Browser (nur lokal)
 // ------------------------------------------------------------------
 function save() {
+  if (state.live) return; // Live-Daten werden nicht im Browser gespeichert
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* Speicher nicht verfügbar */ }
 }
 function restore() {
@@ -424,10 +442,14 @@ function stats(tasks) {
 function render() {
   const has = state.houses.length > 0;
   $('#drop').classList.toggle('hidden', has);
+  $('#liveStart').classList.toggle('hidden', has);
   $('#app').classList.toggle('hidden', !has);
-  $('#btnForget').classList.toggle('hidden', !has);
+  $('#btnForget').classList.toggle('hidden', !has || !!state.live);
+  $('#btnRefresh').classList.toggle('hidden', !state.live);
+  $('#btnLive').classList.toggle('hidden', !!state.live);
   if (!has) { $('#stand').textContent = 'Keine Daten geladen'; return; }
-  $('#stand').textContent = `Stand: ${state.loadedAt ? state.loadedAt.toLocaleString('de-DE') : '–'} · Quelle: ${state.files.join(', ')} · heute ${fmt(today)}`;
+  const quelle = state.live ? `SharePoint live (${state.live})` : state.files.join(', ');
+  $('#stand').textContent = `Stand: ${state.loadedAt ? state.loadedAt.toLocaleString('de-DE') : '–'} · Quelle: ${quelle} · heute ${fmt(today)}`;
   renderKpis(); renderHouses(); renderTimeline(); renderHeat(); renderTermine(); renderFilters(); renderTable();
 }
 
@@ -535,7 +557,7 @@ function renderTable() {
   $('#tbody').innerHTML = rows.slice(0, 800).map(t => {
     const over = isOverdue(t), soon = !over && OPEN.includes(t.status) && t.frist && t.frist <= addDays(today, 7);
     const fristTxt = t.frist ? fmt(t.frist) + (over ? ` (${-daysUntil(t.frist)} T.)` : '') : esc(t.fristText || '–');
-    return `<tr><td>${esc(t.haus)}</td><td>${t.nr}</td><td class="muted small">${esc(t.bereich)}</td><td>${esc(t.aufgabe)}${t.hinweis ? `<div class="note">💡 ${esc(t.hinweis)}</div>` : ''}</td>
+    return `<tr><td>${esc(t.haus)}</td><td>${t.nr}</td><td class="muted small">${esc(t.bereich)}</td><td>${t.spUrl ? `<a href="${esc(t.spUrl)}" target="_blank" rel="noopener" style="color:inherit">${esc(t.aufgabe)}</a>` : esc(t.aufgabe)}${t.hinweis ? `<div class="note">💡 ${esc(t.hinweis)}</div>` : ''}</td>
       <td>${esc(t.owner)}</td><td class="frist ${over ? 'over' : soon ? 'soon' : ''}">${fristTxt}</td>
       <td><span class="st st-${t.status}">${t.status}</span></td><td class="note">${esc(t.notiz)}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="muted" style="padding:20px">Keine Punkte für diesen Filter.</td></tr>';
@@ -545,6 +567,7 @@ function renderTable() {
 // Generator: Neues Haus -> Checkliste
 // ------------------------------------------------------------------
 function buildNewHouse() {
+  if (state.live) { $('#gMsg').textContent = 'ℹ Im Live-Modus neue Häuser bitte in der SharePoint-Liste „DHO Häuser“ anlegen (bzw. per 02_Neues-Haus.ps1) – die Checkliste erscheint dann hier automatisch nach „Aktualisieren“.'; }
   const name = $('#gName').value.trim(), ort = $('#gOrt').value.trim();
   const ue = toDate($('#gUe').value), x = toDate($('#gX').value);
   if (!state.vorlage.length) { $('#gMsg').textContent = '⚠ Keine Vorlage geladen – bitte IT-Checklisten_Standorte.xlsx (mit Blatt „Vorlage“) laden.'; return null; }
@@ -593,6 +616,133 @@ $('#gCsv').onclick = () => {
 };
 
 // ------------------------------------------------------------------
+// Live-Modus: SharePoint-Listen über Microsoft Graph (MSAL, delegiert)
+// Konfiguration kommt aus URL-Parametern (?tenant=&client=&site=) oder
+// wird einmalig eingegeben und nur in diesem Browser gespeichert.
+// ------------------------------------------------------------------
+const CFG_KEY = 'dho-sp-config-v1';
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+const SCOPES = ['https://graph.microsoft.com/Sites.Read.All'];
+const LISTS = { haeuser: 'DHO Häuser', aufgaben: 'DHO Aufgaben', vorlage: 'DHO Checkliste Vorlage' };
+let msalApp = null, refreshTimer = null;
+
+function loadCfg() {
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch (e) { }
+  const p = new URLSearchParams(location.search);
+  for (const k of ['tenant', 'client', 'site']) if (p.get(k)) c[k] = p.get(k);
+  return c;
+}
+function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) { } }
+function cfgFromForm() {
+  return { tenant: $('#cTenant').value.trim(), client: $('#cClient').value.trim(), site: $('#cSite').value.trim().replace(/\/+$/, '') };
+}
+function fillCfgForm(c) { $('#cTenant').value = c.tenant || ''; $('#cClient').value = c.client || ''; $('#cSite').value = c.site || ''; }
+const cfgComplete = c => c.tenant && c.client && /^https:\/\/[^/]+\.sharepoint\.com\/sites\/[^/]+/i.test(c.site || '');
+
+async function getMsal(c) {
+  if (typeof msal === 'undefined') throw new Error('MSAL-Bibliothek nicht geladen (lib/msal-browser.min.js).');
+  if (!msalApp) {
+    msalApp = new msal.PublicClientApplication({
+      auth: { clientId: c.client, authority: `https://login.microsoftonline.com/${c.tenant}`, redirectUri: location.origin + location.pathname },
+      cache: { cacheLocation: 'localStorage' }
+    });
+    if (msalApp.initialize) await msalApp.initialize();
+    await msalApp.handleRedirectPromise();
+  }
+  return msalApp;
+}
+async function getToken(c, interactive) {
+  const app = await getMsal(c);
+  let account = app.getAllAccounts()[0];
+  if (!account) {
+    if (!interactive) return null;
+    account = (await app.loginPopup({ scopes: SCOPES, prompt: 'select_account' })).account;
+  }
+  try { return (await app.acquireTokenSilent({ scopes: SCOPES, account })).accessToken; }
+  catch (e) {
+    if (!interactive) return null;
+    return (await app.acquireTokenPopup({ scopes: SCOPES, account })).accessToken;
+  }
+}
+async function graph(url, token) {
+  const r = await fetch(url.startsWith('http') ? url : GRAPH + url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) {
+    let msg = r.status + ' ' + r.statusText;
+    try { const j = await r.json(); msg = j.error?.message || msg; } catch (e) { }
+    throw new Error(`Graph ${r.status}: ${msg}`);
+  }
+  return r.json();
+}
+async function graphAll(url, token) {
+  const out = [];
+  while (url) { const j = await graph(url, token); out.push(...(j.value || [])); url = j['@odata.nextLink']; }
+  return out;
+}
+const spDate = v => v ? toDate(new Date(v)) : null;   // UTC-Zeitstempel -> lokales Datum
+const num = v => (v === null || v === undefined || v === '') ? '' : +v;
+
+async function loadLive(interactive) {
+  const c = loadCfg();
+  if (!cfgComplete(c)) { $('#liveStart').classList.remove('hidden'); $('#cMsg').textContent = 'Bitte Tenant-ID, Client-ID und Site-URL eintragen.'; return false; }
+  const btn = $('#btnRefresh'); btn.disabled = true; $('#cMsg').textContent = 'Verbinde …';
+  try {
+    const token = await getToken(c, interactive);
+    if (!token) { $('#cMsg').textContent = 'Bitte „Anmelden und laden“ klicken.'; return false; }
+    const u = new URL(c.site);
+    const site = await graph(`/sites/${u.hostname}:${u.pathname}`, token);
+    const items = name => graphAll(`/sites/${site.id}/lists/${encodeURIComponent(name)}/items?expand=fields&$top=999`, token);
+    const [hs, ts, vs] = await Promise.all([items(LISTS.haeuser), items(LISTS.aufgaben), items(LISTS.vorlage).catch(() => [])]);
+    const listUrl = n => `${c.site}/Lists/${n}`;
+
+    const houses = hs.map(i => i.fields).map(f => ({
+      spId: +f.id, ort: f.Ort || f.Title, name: f.Title || f.Ort, ue: spDate(f.Uebernahmetag), x: spDate(f.GoLive),
+      direktor: f.Direktor || '', oracle: f.OraclePL || '', projektstatus: f.Projektstatus || '', quelle: 'SharePoint'
+    }));
+    const tasks = ts.map(i => i.fields).map(f => ({
+      haus: f.Haus || (houses.find(h => h.spId === +f.HausID) || {}).ort || '?',
+      nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '',
+      bezug: f.Bezug || 'fix', offset: num(f.OffsetTage), frist: spDate(f.Frist), fristText: f.FristText || '',
+      status: normStatus(f.Status), notiz: f.Notiz || '', hinweis: f.Hinweis || '',
+      erledigtAm: spDate(f.ErledigtAm), spUrl: `${listUrl('DHOAufgaben')}/EditForm.aspx?ID=${f.id}`
+    }));
+    const vorlage = vs.map(i => i.fields).filter(f => f.Aktiv !== false).map(f => ({
+      nr: +f.Nr || 0, bereich: f.Bereich || '', aufgabe: f.Title || '', owner: f.Owner || '',
+      bezug: f.Bezug || 'fix', offset: num(f.OffsetTage), fristRaw: f.FristText || null, hinweis: f.Hinweis || '', status: 'offen', notiz: ''
+    })).sort((a, b) => a.nr - b.nr);
+
+    // "Nächste Termine" aus Ü- und Go-Live-Daten ableiten
+    const termine = houses.flatMap(h => [
+      h.ue && { d: h.ue, haus: h.ort, was: 'Übernahme (Ü)' },
+      h.x && { d: h.x, haus: h.ort, was: 'Go-Live Hotelsystem (X)' }
+    ]).filter(t => t && t.d >= addDays(today, -7)).sort((a, b) => a.d - b.d)
+      .map(t => ({ datum: fmtShort(t.d) + (t.d < today ? ' ✓' : ''), haus: t.haus, was: t.was + (t.d >= today ? ` · in ${daysUntil(t.d)} Tagen` : '') }));
+
+    houses.sort((a, b) => (a.ue || a.x || new Date(9e15)) - (b.ue || b.x || new Date(9e15)));
+    state = { houses, tasks, vorlage, termine, loadedAt: new Date(), files: [], live: u.pathname.split('/').pop() };
+    $('#cMsg').textContent = '';
+    render();
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => loadLive(false), 5 * 60 * 1000);
+    return true;
+  } catch (e) {
+    console.error(e);
+    let hint = '';
+    if (/AADSTS50011|redirect/i.test(e.message)) hint = ` – Redirect-URI „${location.origin + location.pathname}“ in der App-Registrierung als SPA eintragen.`;
+    else if (/AADSTS65001|consent/i.test(e.message)) hint = ' – Berechtigung Sites.Read.All (Graph, delegiert) erteilen und Admin-Zustimmung geben.';
+    else if (/404/.test(e.message)) hint = ' – Site-URL oder Listennamen prüfen.';
+    $('#cMsg').textContent = '⚠ ' + e.message + hint;
+    $('#liveStart').classList.remove('hidden');
+    alert('SharePoint-Laden fehlgeschlagen:\n' + e.message + hint);
+    return false;
+  } finally { btn.disabled = false; }
+}
+
+$('#cConnect').onclick = () => { const c = cfgFromForm(); if (!cfgComplete(c)) { $('#cMsg').textContent = '⚠ Bitte alle drei Felder korrekt ausfüllen.'; return; } saveCfg(c); msalApp = null; loadLive(true); };
+$('#btnLive').onclick = () => { const c = loadCfg(); if (cfgComplete(c)) loadLive(true); else { state = { houses: [], tasks: [], vorlage: [], termine: [], loadedAt: null, files: [] }; render(); $('#cTenant').focus(); } };
+$('#btnRefresh').onclick = () => loadLive(true);
+
+// ------------------------------------------------------------------
 // Events
 // ------------------------------------------------------------------
 $('#file').onchange = e => { loadFiles([...e.target.files]); e.target.value = ''; };
@@ -620,7 +770,12 @@ document.addEventListener('mousemove', e => {
   tip.style.top = (e.clientY + 14) + 'px';
 });
 
-restore(); render();
+// Start: Live-Modus, wenn konfiguriert und bereits angemeldet – sonst lokale Daten
+(async () => {
+  const c = loadCfg(); fillCfgForm(c);
+  if (cfgComplete(c)) { saveCfg(c); if (await loadLive(false)) return; }
+  restore(); render();
+})();
 </script>
 </body>
 </html>

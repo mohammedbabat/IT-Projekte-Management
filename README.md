@@ -9,7 +9,7 @@ Dashboard und Automatisierung für die IT-Checklisten bei Hotelübernahmen.
 
 ## 1. Dashboard (`index.html`)
 
-Aufruf über GitHub Pages oder lokal per Doppelklick.
+Aufruf über GitHub Pages. Zwei Datenquellen: **live aus SharePoint** (siehe Abschnitt 4) oder Excel-/CSV-Datei:
 
 1. `IT-Checklisten_Standorte.xlsx` per Drag & Drop laden (ein Blatt pro Haus + Blatt „Vorlage“)
 2. optional zusätzlich `PM_Checkliste_DHO_Uebernahmen.xlsx` für „Nächste Termine“
@@ -92,8 +92,21 @@ Punkte mit Bezug `fix` haben einen Text („sofort“, „laufend“).
 - Montag 07:30: Mail an jeden Owner mit überfälligen und in 7 Tagen fälligen Punkten
 - Freitag 12:00: Wochenstatus an die Projektleitung (Ansicht „Überfällig“ + „Nächste 14 Tage“ als HTML-Tabelle)
 
-## Ausbaustufe: Dashboard live aus SharePoint
+## 4. Dashboard live aus SharePoint
 
-Statt Excel-Upload kann `index.html` die Listen direkt über Microsoft Graph lesen
-(MSAL.js + App-Registrierung mit `Sites.Read.All`, delegiert). Dann ist das Dashboard
-immer aktuell, ohne dass Daten im Repo liegen.
+`index.html` liest die Listen `DHO Häuser`, `DHO Aufgaben` und `DHO Checkliste Vorlage`
+direkt über Microsoft Graph, mit der Anmeldung des Benutzers (delegiert, nur lesen).
+Es werden keine Daten im Repo oder auf einem Server gespeichert. Aktualisierung alle 5 Minuten
+und per Knopf; jede Aufgabe verlinkt auf ihr SharePoint-Bearbeitungsformular.
+
+Einmalige Einrichtung (Entra ID → App-Registrierungen → Neue Registrierung, z. B. „DHO-Dashboard“):
+
+1. Kontotyp: nur dieses Organisationsverzeichnis
+2. Plattform **Single-Page-Anwendung (SPA)**, Umleitungs-URIs:
+   - `https://<github-user>.github.io/<repo>/`
+   - `https://<github-user>.github.io/<repo>/index.html`
+3. API-Berechtigungen → Microsoft Graph → Delegiert → `Sites.Read.All` → Administratorzustimmung erteilen
+4. Dashboard aufrufen und Tenant-ID, Client-ID und Site-URL eintragen – oder als Lesezeichen:
+   `https://<github-user>.github.io/<repo>/?tenant=<tenant-id>&client=<client-id>&site=https://<tenant>.sharepoint.com/sites/<site>`
+
+Die Bibliothek `lib/msal-browser.min.js` (MSAL 2.39.0, MIT-Lizenz) liegt im Repo, damit die Seite ohne fremdes CDN anmeldet.
