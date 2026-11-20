@@ -1,0 +1,5 @@
+# Projektdaten niemals ins öffentliche Repo
+*.xlsx
+*.xlsm
+*.xls
+*.csv
