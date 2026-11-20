@@ -993,8 +993,11 @@ function renderPersonen() {
   $('#btnDigest').disabled = !mOn || !empf.length;
   $('#btnTestMail').disabled = !mOn;
   $('#mailInfo').innerHTML = !state.live ? '<span class="muted">E-Mails gibt es nur im Live-Modus (SharePoint).</span>'
-    : !mOn ? '<span class="muted">Kein Absender-Postfach eingerichtet – in der Startseite unter „Absender für E-Mails“ eintragen (oder Link mit &amp;mail=…).</span>'
-    : `Absender: <b>${esc(sp.cfg.mail)}</b> · Empfänger: <b>${empf.length}</b> Personen mit E-Mail und „Benachrichtigen“${sp.hatBenachrichtigen ? '' : ' <span class="muted">(Spalte „Benachrichtigen“ fehlt noch in SharePoint – Setup-Skript ausführen)</span>'}.<br>
+    : !mOn ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>Absender-Postfach (Shared Mailbox):</span>
+        <input id="mailSet" placeholder="z. B. IT-Projekt@firma.de" style="min-width:280px" value="${esc(loadCfg().mail || '')}">
+        <button class="primary small" id="mailSetBtn">Übernehmen</button></div>
+        <span class="muted">Danach meldet Microsoft dich ggf. kurz neu an (Berechtigung zum Senden).</span>`
+    : `Absender: <b>${esc(sp.cfg.mail)}</b> <a href="#" id="mailEdit" class="small">ändern</a> · Empfänger: <b>${empf.length}</b> Personen mit E-Mail und „Benachrichtigen“${sp.hatBenachrichtigen ? '' : ' <span class="muted">(Spalte „Benachrichtigen“ fehlt noch in SharePoint – Setup-Skript ausführen)</span>'}.<br>
        <span class="muted">Automatisch: Mail an <b>neu</b> eingetragene Zuständige beim Speichern (wer vorher schon eingetragen war, bekommt keine erneute Mail). Wochenübersicht: überfällige + in 14 Tagen fällige Aufgaben je Person.</span>`;
   const used = usedNames();
   const offen = n => state.tasks.filter(t => OPEN.includes(t.status) && splitOwners(t.owner).includes(n)).length;
@@ -1765,6 +1768,25 @@ $('#btnNewVorlage').onclick = () => {
 };
 
 $('#btnNewPerson').onclick = () => personForm({ id: null, name: '', rolle: '', firma: '', email: '', aktiv: true, benachrichtigen: true }, true);
+// Absender direkt auf der Seite Personen setzen / ändern
+$('#mailInfo').addEventListener('click', async e => {
+  if (e.target.id === 'mailEdit') {
+    e.preventDefault();
+    const neu = prompt('Absender-Postfach (Shared Mailbox):', sp.cfg.mail || '');
+    if (neu !== null) await setzeAbsender(neu.trim());
+  }
+  if (e.target.id === 'mailSetBtn') await setzeAbsender($('#mailSet').value.trim());
+});
+async function setzeAbsender(adresse) {
+  if (adresse && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adresse)) { toast('Bitte eine gültige E-Mail-Adresse eingeben.', true); return; }
+  const c = loadCfg(); c.mail = adresse; saveCfg(c);
+  sp.cfg = c;
+  const q = new URLSearchParams(location.search); if (adresse) q.set('mail', adresse); else q.delete('mail');
+  history.replaceState(null, '', `${location.pathname}?${q}${location.hash}`);
+  // Token mit Sende-Berechtigung holen (leitet bei Bedarf kurz zur Anmeldung weiter)
+  try { const t = await getToken(c, true); if (t) { toast(adresse ? `Absender ${adresse} gespeichert.` : 'E-Mail-Versand ausgeschaltet.'); render(); } }
+  catch (err) { toast(err.message, true); }
+}
 $('#btnTestMail').onclick = async () => {
   await runBusy($('#btnTestMail'), async () => {
     const acc = msalApp && ((msalApp.getActiveAccount && msalApp.getActiveAccount()) || msalApp.getAllAccounts()[0]);
