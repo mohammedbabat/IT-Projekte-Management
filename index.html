@@ -385,7 +385,10 @@
     <section class="card" id="mailCard">
       <div class="card-head">
         <h2>E-Mail-Benachrichtigung</h2>
-        <button class="primary" id="btnDigest">Wochenübersicht jetzt senden</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnTestMail">Test-Mail an mich senden</button>
+          <button class="primary" id="btnDigest">Wochenübersicht jetzt senden</button>
+        </div>
       </div>
       <div id="mailInfo" class="small"></div>
     </section>
@@ -988,10 +991,11 @@ function renderPersonen() {
   const mOn = mailer.enabled();
   const empf = state.personen.filter(p => mailer.isRecipient(p));
   $('#btnDigest').disabled = !mOn || !empf.length;
+  $('#btnTestMail').disabled = !mOn;
   $('#mailInfo').innerHTML = !state.live ? '<span class="muted">E-Mails gibt es nur im Live-Modus (SharePoint).</span>'
     : !mOn ? '<span class="muted">Kein Absender-Postfach eingerichtet – in der Startseite unter „Absender für E-Mails“ eintragen (oder Link mit &amp;mail=…).</span>'
     : `Absender: <b>${esc(sp.cfg.mail)}</b> · Empfänger: <b>${empf.length}</b> Personen mit E-Mail und „Benachrichtigen“${sp.hatBenachrichtigen ? '' : ' <span class="muted">(Spalte „Benachrichtigen“ fehlt noch in SharePoint – Setup-Skript ausführen)</span>'}.<br>
-       <span class="muted">Automatisch: Mail an neu eingetragene Zuständige beim Speichern. Wochenübersicht: überfällige + in 14 Tagen fällige Aufgaben je Person.</span>`;
+       <span class="muted">Automatisch: Mail an <b>neu</b> eingetragene Zuständige beim Speichern (wer vorher schon eingetragen war, bekommt keine erneute Mail). Wochenübersicht: überfällige + in 14 Tagen fällige Aufgaben je Person.</span>`;
   const used = usedNames();
   const offen = n => state.tasks.filter(t => OPEN.includes(t.status) && splitOwners(t.owner).includes(n)).length;
   $('#pbody').innerHTML = [...state.personen].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(p =>
@@ -1761,6 +1765,17 @@ $('#btnNewVorlage').onclick = () => {
 };
 
 $('#btnNewPerson').onclick = () => personForm({ id: null, name: '', rolle: '', firma: '', email: '', aktiv: true, benachrichtigen: true }, true);
+$('#btnTestMail').onclick = async () => {
+  await runBusy($('#btnTestMail'), async () => {
+    const acc = msalApp && ((msalApp.getActiveAccount && msalApp.getActiveAccount()) || msalApp.getAllAccounts()[0]);
+    const an = acc && acc.username;
+    if (!an) throw new Error('Angemeldetes Konto nicht ermittelbar – bitte neu anmelden.');
+    const titel = 'Test-Mail aus dem DHO-Dashboard';
+    const intro = `<p style="margin:0;">Hallo,</p><p style="margin:16px 0 0;">diese Test-Mail wurde am ${new Date().toLocaleString('de-DE')} aus dem DHO-Dashboard über <b>${esc(sp.cfg.mail)}</b> an <b>${esc(an)}</b> gesendet. Der E-Mail-Versand funktioniert.</p>`;
+    await mailer.send([{ to: an, subject: titel, html: mailer.layout({ titel, intro, inhalt: '', buttonText: 'Dashboard öffnen', buttonUrl: mailer.baseUrl() }) }]);
+    toast(`✉ Test-Mail an ${an} gesendet – bitte Posteingang (und Junk) prüfen.`);
+  });
+};
 $('#btnDigest').onclick = async () => {
   const empf = state.personen.filter(mailer.isRecipient);
   if (!confirm(`Wochenübersicht an ${empf.length} Personen senden (nur wer überfällige oder bald fällige Aufgaben hat)?`)) return;
