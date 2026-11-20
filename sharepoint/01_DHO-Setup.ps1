@@ -29,11 +29,19 @@
 param(
     [Parameter(Mandatory)] [string]$SiteUrl,
     [Parameter(Mandatory)] [string]$ClientId,
-    [string]$CsvPfad = $PSScriptRoot,
+    [string]$CsvPfad,
     [switch]$BestandImportieren
 )
 
 $ErrorActionPreference = 'Stop'
+
+# CSV-Ordner bestimmen: Parameter -> Ordner des Skripts -> aktueller Ordner
+if ([string]::IsNullOrWhiteSpace($CsvPfad)) { $CsvPfad = $PSScriptRoot }
+if ([string]::IsNullOrWhiteSpace($CsvPfad)) { $CsvPfad = (Get-Location).Path }
+if (-not (Test-Path (Join-Path $CsvPfad 'DHO_Vorlage.csv'))) {
+    throw "DHO_Vorlage.csv nicht gefunden in '$CsvPfad'. Bitte -CsvPfad angeben, z. B. -CsvPfad 'C:\DHO'."
+}
+Write-Host "CSV-Ordner: $CsvPfad" -ForegroundColor DarkGray
 
 # ------------------------------------------------------------------
 # Konfiguration
